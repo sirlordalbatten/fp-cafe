@@ -1,0 +1,12 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+# never commit secrets
+.env
+.env.*
+*.pem
+*.key
+id_*
+node_modules/

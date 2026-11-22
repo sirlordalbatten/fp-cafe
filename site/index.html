@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>FP Café, the all-night diner for defenders</title>
+<meta name="description" content="An all-night diner for SOC analysts. CVE arrivals board, daily digest, detections in KQL, SPL, YARA-L and Sigma, team games and break-room tools.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/app.css">
+<script src="js/app.js" defer></script>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+<svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-lounge" viewBox="0 0 24 24"><path d="M3 12c3-4 7-5 11-3l4-3v12l-4-3c-4 2-8 1-11-3z"/><circle cx="8" cy="11" r=".8" class="f"/></symbol>
+  <symbol id="i-brew" viewBox="0 0 24 24"><path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c0 1.5 1.5 1.5 1.5 3M12 3.5c0 1.5 1.5 1.5 1.5 3"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-fame" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9.5 17h5"/></symbol>
+  <symbol id="i-learn" viewBox="0 0 24 24"><path d="M4 5c3-1 6-1 8 1 2-2 5-2 8-1v13c-3-1-6-1-8 1-2-2-5-2-8-1z"/><path d="M12 6v13"/></symbol>
+  <symbol id="i-detect" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-arcade" viewBox="0 0 24 24"><path d="M6 9h12a3 3 0 0 1 3 3l-1 4a2 2 0 0 1-3.5 1L15 15H9l-1.5 2A2 2 0 0 1 4 16l-1-4a3 3 0 0 1 3-3z"/><path d="M8 11v3M6.5 12.5h3"/><circle cx="16" cy="12" r=".8" class="f"/><circle cx="17.5" cy="13.5" r=".8" class="f"/></symbol>
+  <symbol id="i-tycoon" viewBox="0 0 24 24"><path d="M4 20V9l6-4v15M10 20V3h10v17M3 20h18"/><path d="M13 7h4M13 10h4M13 13h4M6 12h2M6 15h2"/></symbol>
+  <symbol id="i-shop" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+  <symbol id="i-socdle" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></symbol>
+  <symbol id="i-breakroom" viewBox="0 0 24 24"><path d="M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M3 12a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v5H3z"/><path d="M5 17v2M19 17v2"/></symbol>
+  <symbol id="i-shift" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M10 3h4"/></symbol>
+  <symbol id="i-me" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-bean" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="6" ry="8" transform="rotate(30 12 12)"/><path d="M9 6c3 3 3 9 6 12"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/></symbol>
+  <symbol id="i-storm" viewBox="0 0 24 24"><path d="M7 15a4 4 0 0 1-.5-8A6 6 0 0 1 18 6a4.5 4.5 0 0 1-.5 9"/><path d="M12 12l-2 4h3l-2 4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 24 24"><path d="M4.5 14.5l10-10a3.5 3.5 0 0 1 5 5l-10 10a3.5 3.5 0 0 1-5-5z"/><path d="M9 10l5 5"/><circle cx="11" cy="12" r=".6" class="f"/><circle cx="13" cy="11" r=".6" class="f"/><circle cx="12" cy="13.5" r=".6" class="f"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19 15A8 8 0 0 1 9 5a8 8 0 1 0 10 10z"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 24 24"><path d="M4 9h16v11H4z"/><path d="M6 9l10-5"/><circle cx="15" cy="14.5" r="2.5"/><path d="M7 13h3M7 16h3"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><path d="M9 9h11v11H9z"/><path d="M5 15H4V4h11v1"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><circle cx="8.5" cy="8.5" r="1" class="f"/><circle cx="15.5" cy="15.5" r="1" class="f"/><circle cx="12" cy="12" r="1" class="f"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-siren" viewBox="0 0 24 24"><path d="M6 18v-6a6 6 0 0 1 12 0v6"/><path d="M4 18h16v3H4zM12 3V1.5M4.5 6 3.5 5M19.5 6l1-1"/></symbol>
+  <symbol id="i-hook" viewBox="0 0 24 24"><path d="M14 3v11a4 4 0 0 1-8 0v-2l-2 2"/></symbol>
+  <symbol id="i-fish" viewBox="0 0 24 24"><path d="M3 12c3-4 7-5 11-3l4-3v12l-4-3c-4 2-8 1-11-3z"/></symbol>
+  <symbol id="i-bubble" viewBox="0 0 24 24"><circle cx="9" cy="14" r="5"/><circle cx="17" cy="7" r="3"/><path d="M7 12a2 2 0 0 1 2-2"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 12c2.5-4 5-4 7.5 0s5 4 7.5 0 3.5-3 5-2"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".9" class="f"/></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24"><path d="M8 4h11v14H8z"/><path d="M5 7v13h11"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 21c-4 0-6-3-6-6 0-4 4-6 4-11 3 2 7 6 7 11 0 3-2 6-5 6z"/><path d="M12 21c-1.5 0-2.5-1-2.5-2.5S12 15 12 15s2.5 2 2.5 3.5S13.5 21 12 21z"/></symbol>
+  <symbol id="i-chili" viewBox="0 0 24 24"><path d="M16 7c-6 0-6 9-12 12 8 2 14-3 14-9 0-2-1-3-2-3z"/><path d="M16 7c0-2 1-3 3-3"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></symbol>
+  <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5M7 17H4v-8h16v8h-3M7 14h10v6H7z"/></symbol>
+  <symbol id="i-hat" viewBox="0 0 24 24"><path d="M8 15V6h8v9M4 15h16v2H4z"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><path d="M4 9h16v4H4zM5 13h14v7H5zM12 9v11"/><path d="M12 9c-2-4-6-3-5 0M12 9c2-4 6-3 5 0"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><path d="M3 7h18v10H3z"/><path d="M6 10h1M9 10h1M12 10h1M15 10h1M18 10h0M7 14h10"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><path d="M5 9h14v10H5z"/><path d="M12 9V5M9 13h0M15 13h0M9 16h6"/><circle cx="12" cy="4" r="1"/></symbol>
+  <symbol id="i-satellite" viewBox="0 0 24 24"><path d="M7 7l4 4M5 9l4-4 6 6-4 4z"/><path d="M14 14l3 3M17 13a4 4 0 0 1-4 4M20 13a7 7 0 0 1-7 7"/></symbol>
+  <symbol id="i-brain" viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3 3 3 0 0 0 3-2V6a3 3 0 0 0-3-2zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3 3 3 0 0 1-3-2"/></symbol>
+  <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M7 4h11v13a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3h11"/><path d="M7 4a2 2 0 0 0-2 2v11M10 8h5M10 11h5"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h12"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-question" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h0"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></symbol>
+  <defs><linearGradient id="holo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ad9"/><stop offset=".35" stop-color="#7afcff"/><stop offset=".7" stop-color="#fff27a"/><stop offset="1" stop-color="#b47aff"/></linearGradient></defs>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M5 11h14v9H5zM8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+</svg>
+
+<div class="app">
+  <nav id="nav" aria-label="Sections">
+    <a class="brand" href="#lounge"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">FP Café</span><span class="brand-sub">open all night</span></a>
+    <p class="navh">On shift</p>
+    <a href="#lounge" data-v="lounge"><svg class="ic"><use href="#i-lounge"/></svg>Lounge</a>
+    <a href="#desk" data-v="desk"><svg class="ic"><use href="#i-users"/></svg>The desk<span class="lv q" id="deskCount" hidden>0</span></a>
+    <a href="#brew" data-v="brew"><svg class="ic"><use href="#i-brew"/></svg>Morning brew<span class="dot" id="brewNew"></span></a>
+    <a href="#menu" data-v="menu"><svg class="ic"><use href="#i-menu"/></svg>CVE menu</a>
+    <a href="#detect" data-v="detect"><svg class="ic"><use href="#i-detect"/></svg>Detection lab</a>
+    <p class="navh">Off the clock</p>
+    <a href="#arcade" data-v="arcade"><svg class="ic"><use href="#i-arcade"/></svg>Arcade</a>
+    <a href="#pwlab" data-v="pwlab"><svg class="ic"><use href="#i-key"/></svg>Password lab</a>
+    <a href="#tycoon" data-v="tycoon"><svg class="ic"><use href="#i-tycoon"/></svg>SOC tycoon</a>
+    <a href="#socdle" data-v="socdle"><svg class="ic"><use href="#i-socdle"/></svg>SOCdle<span class="dot" id="dleNew"></span></a>
+    <a href="#breakroom" data-v="breakroom"><svg class="ic"><use href="#i-breakroom"/></svg>Break room</a>
+    <p class="navh">You</p>
+    <a href="#shift" data-v="shift"><svg class="ic"><use href="#i-shift"/></svg>Shift buddy</a>
+    <a href="#learn" data-v="learn"><svg class="ic"><use href="#i-learn"/></svg>Snack lessons</a>
+    <a href="#shop" data-v="shop"><svg class="ic"><use href="#i-shop"/></svg>Café shop</a>
+    <a href="#me" data-v="me"><svg class="ic"><use href="#i-me"/></svg>My corner<span class="lv" id="lvlNav">1</span></a>
+    <p class="navfoot">No logins, cookies or trackers. Everything you do here stays in this browser.</p>
+  </nav>
+
+  <main>
+    <header class="strip">
+      <span class="hello" id="hello">Hi</span>
+      <a class="sb" id="beansChip" href="#shop">0 beans</a>
+      <span class="sb ev" id="evChip" hidden></span>
+      <span class="sb" id="weather">…</span>
+      <span class="sb">Patch Tuesday <b id="pt">…</b></span>
+      <span class="sb" id="clock">--:--</span>
+      <span class="sb demo" title="This prototype uses a built-in snapshot. In production the pipeline refreshes data hourly.">snapshot data</span>
+      <span class="grow"></span>
+      <button class="iconbtn" id="radioBtn" aria-expanded="false" aria-controls="radio"><svg class="ic"><use href="#i-radio"/></svg><span>Radio</span></button>
+      <button class="iconbtn" id="amb" title="Ambient mode: just the board and the tank"><svg class="ic"><use href="#i-expand"/></svg><span>Ambient</span></button>
+      <div class="radio" id="radio" hidden>
+        <p class="radio-title">Night radio</p>
+        <label class="rrow"><input type="checkbox" data-ch="hum"> Server room hum</label>
+        <label class="rrow"><input type="checkbox" data-ch="rain"> Rain on the window</label>
+        <label class="rrow"><input type="checkbox" data-ch="lofi"> Lo-fi tape, 3 AM</label>
+        <label class="rrow"><input type="checkbox" id="sfxOn"> Sound effects</label>
+        <label class="rrow"><input type="checkbox" id="skyOn"> Rain on the window (visual)</label>
+        <label class="rrow vol">Volume <input type="range" id="vol" min="0" max="100" value="60"></label>
+        <p class="radio-note">Everything is synthesised in your browser. Nothing is streamed.</p>
+      </div>
+    </header>
+
+    <!-- LOUNGE -->
+    <section class="view" id="v-lounge">
+      <div class="board" id="flapBoard" aria-label="CVE arrivals board">
+        <div class="board-head">
+          <h1 class="board-title">Arrivals</h1>
+          <div class="board-days"><div class="flaps" id="daysFlap" aria-hidden="true"></div><p>days since the last critical edge-device CVE <span class="board-days-sub" id="signsub"></span></p><span class="sr" id="days">0</span></div>
+        </div>
+        <div class="board-cols" aria-hidden="true"><span>CVE</span><span>Flight</span><span class="col-prod">From</span><span>Status</span></div>
+        <div class="board-rows" id="flapRows"></div>
+      </div>
+
+      <div class="lounge">
+        <div class="leftcol">
+        <div class="monitor">
+          <div class="aq" id="aq">
+            <canvas id="tank"></canvas>
+            <button class="iconbtn on-glass" id="fs"><svg class="ic"><use href="#i-expand"/></svg><span>Screensaver</span></button>
+            <div class="legend"><span class="k kev">in KEV</span><span class="k crit">critical</span><span class="k high">high</span><span class="k hof">hall of fame</span><span class="k phish">phish</span></div>
+            <div class="fishcard" id="fishcard"><button class="x" id="fcx" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button><div id="fcbody"></div></div>
+          </div>
+          <p class="monitor-caption">The tank. Every fish is a CVE in the news. Tap one to read it, and report the phish when it swims by.</p>
+        </div>
+        <div class="under">
+          <div class="panel"><div class="ph"><h3>Today in ten seconds</h3><a class="link" href="#brew">Read the brew</a></div><div id="miniBrew" class="mini"></div></div>
+          <div class="panel"><div class="ph"><h3>Shift horoscope</h3></div><div class="seg" id="roles"></div><p id="horo" class="horo"></p><p class="muted small" id="lucky"></p></div>
+        </div>
+        </div>
+
+        <aside class="side">
+          <div class="panel drop" id="dropCard" hidden>
+            <svg class="ic big"><use href="#i-gift"/></svg>
+            <div><h3>Today's drop</h3><p class="muted" id="dropInfo"></p><button class="btn primary" id="dropBtn">Open it</button></div>
+          </div>
+          <div class="panel buddy">
+            <div class="buddy-row">
+              <div class="petwrap"><div class="hat" id="hat" hidden></div><button class="mascot" id="cat" title="Pet your buddy" aria-label="Pet your buddy"></button></div>
+              <div class="say" id="say">…</div>
+            </div>
+            <div id="petBars"></div><div class="snackrow" id="snacks"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><h3>Daily quests</h3><span class="muted" id="questHint"></span><button class="btn ghost sm" id="miDrill" title="Practice a pop incident">Drill</button></div>
+            <div id="quests"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><h3>How are you, really?</h3></div>
+            <div class="moods" id="moods"></div><p class="muted small" id="moodReply"></p>
+          </div>
+        </aside>
+      </div>
+      <div class="pager"><span class="pager-label">Pager</span><div class="ticker"><div class="track" id="ticker"></div></div></div>
+    </section>
+
+    <!-- THE DESK -->
+    <section class="view" id="v-desk">
+      <div class="vh"><h1>The desk</h1><p>A small SOC: you, the queue, and everyone in the building who thinks you're the helpdesk. Route each one, and bounce what isn't yours.</p></div>
+      <div class="deskgrid">
+        <div class="panel queue"><div class="ph"><h3>The queue</h3><span class="muted">new ones arrive while this tab is open</span><button class="btn sm" id="coffeeBtn"><svg class="ic"><use href="#i-brew"/></svg>Make a coffee</button></div>
+          <div class="desknote" id="deskNote" aria-live="polite"></div><div id="deskQueue"></div></div>
+        <aside class="stack">
+          <div class="panel"><div class="ph"><h3>The CISO</h3></div><div id="cisoBox"></div></div>
+          <div class="panel"><div class="ph"><h3>Today at the desk</h3></div><div class="deskstats" id="deskStats"></div></div>
+          <div class="panel"><div class="ph"><h3>Tool status</h3><span class="muted">made up, but you know it's true</span></div><div id="tools"></div><div class="toolreply" id="toolReply" aria-live="polite"></div><div class="jar" id="jar"></div></div>
+          <div class="panel"><div class="ph"><h3>The PEBKAC wall</h3><button class="btn ghost sm" id="pebNext">Next story</button></div><div id="pebkac"></div></div>
+        </aside>
+      </div>
+      <p class="muted small">Everyone at this desk is fictional. Tool statuses and replies are jokes about the job, not real outage information.</p>
+    </section>
+
+    <!-- PASSWORD LAB -->
+    <section class="view" id="v-pwlab">
+      <div class="vh"><h1>Password lab</h1><p>See how long a password would survive, then crack a colleague's. Everything runs in your browser. Nothing is stored or sent.</p></div>
+      <div class="two">
+        <div class="panel"><div class="ph"><h3>How long would it survive?</h3></div>
+          <p class="warn">Don't type a password you actually use. Type one like it.</p>
+          <div class="row"><input class="search grow" type="password" id="pwIn" placeholder="Try a password" autocomplete="off" spellcheck="false" aria-label="Password to test"><button class="btn sm" id="pwShow">Show</button></div>
+          <div class="bar pwbar"><i id="pwMeter"></i></div><div id="pwOut"></div>
+          <div class="pp"><p class="lbl">Want a strong one?</p><p class="muted small">Four random words beat most "complex" passwords, and you can actually remember them.</p>
+            <div class="row"><button class="btn" id="ppGen">Generate a passphrase</button><code class="ppout" id="ppOut"></code></div></div></div>
+        <div class="panel"><div class="ph"><h3>Crack a colleague</h3><span class="muted">a new victim every day</span></div><div id="crack"></div></div>
+      </div>
+    </section>
+
+    <!-- MORNING BREW -->
+    <section class="view" id="v-brew">
+      <div class="brew">
+        <article class="receipt">
+          <p class="r-shop">FP CAFÉ&nbsp;&nbsp;&nbsp;TABLE 3&nbsp;&nbsp;&nbsp;NIGHT SHIFT</p>
+          <h1 id="brewDate">Morning brew</h1>
+          <p class="r-sub">Your two-minute digest. Read it with coffee, not with panic.</p>
+          <div class="r-rule"></div>
+          <h2>Three things to know</h2>
+          <div id="brewItems"></div>
+          <div class="r-rule"></div>
+          <h2>For your manager</h2>
+          <div id="mgr"></div>
+          <div class="r-rule"></div>
+          <h2>Word of the day</h2>
+          <div id="term"></div>
+          <div class="r-rule"></div>
+          <h2>On this day</h2>
+          <div id="otd"></div>
+          <p class="r-thanks">Thank you for defending. Please come again.</p>
+        </article>
+        <div class="panel det-today">
+          <div class="ph"><h3>Detection of the day</h3><span class="muted">KQL, SPL, YARA-L and Sigma</span></div>
+          <div id="detBrew"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CVE MENU -->
+    <section class="view" id="v-menu">
+      <div class="vh"><h1>The CVE menu</h1><p>Today's specials, rated by heat. Every dish comes with a roast and the grown-up advice.</p></div>
+      <div class="filters"><input class="search" id="mq" placeholder="Search CVE, product or nickname" aria-label="Search the menu"><div class="seg" id="mf"></div></div>
+      <h2 class="sub">Today's specials</h2>
+      <div class="cards" id="menuNow"></div>
+      <h2 class="sub">Aged classics</h2>
+      <div class="cards" id="menuOld"></div>
+    </section>
+
+    <!-- HALL OF FAME -->
+    <section class="view" id="v-fame">
+      <div class="vh"><h1>Hall of fame, and shame</h1><p>The bugs that cancelled our weekends, and a timeline of the days the internet caught fire.</p></div>
+      <div class="two">
+        <div><div class="seg" id="eras"></div><div class="cards" id="hof"></div></div>
+        <div class="panel"><div class="ph"><h3>Breach timeline</h3><span class="muted">the highlighted one is closest to today</span></div><div class="tl" id="tl"></div></div>
+      </div>
+    </section>
+
+    <!-- LEARN -->
+    <section class="view" id="v-learn">
+      <div class="vh"><h1>Snack lessons</h1><p>Small things every analyst should know cold. Five minutes a day.</p></div>
+      <div class="seg tabs" id="ltabs">
+        <button data-p="ev" class="on">Windows event IDs</button><button data-p="sys">Sysmon IDs</button><button data-p="logon">Logon types</button><button data-p="cards">ATT&amp;CK flashcards</button>
+      </div>
+      <div class="panel">
+        <div class="pane on" id="l-ev"><input class="search" id="evq" placeholder="Filter: 4624, kerberos, service" aria-label="Filter event IDs"><table class="cheat" id="evt"></table></div>
+        <div class="pane" id="l-sys"><table class="cheat" id="syst"></table></div>
+        <div class="pane" id="l-logon"><table class="cheat" id="lgt"></table></div>
+        <div class="pane" id="l-cards">
+          <p class="muted">Tap the card to flip it. Score yourself honestly; the SIEM can't see this.</p>
+          <div class="flipwrap"><div class="flip" id="flip"><div class="in"><div class="f" id="ff1"></div><div class="b" id="fb1"></div></div></div></div>
+          <div class="row"><button class="btn" id="cardNo">Didn't know it</button><button class="btn primary" id="cardYes">Knew it</button><span class="muted" id="cardScore"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SOCDLE -->
+    <section class="view" id="v-socdle">
+      <div class="vh"><h1>SOCdle</h1><p>One five-letter security word a day, six guesses. Everyone gets the same word, so compare at standup.</p></div>
+      <div class="two">
+        <div class="panel"><div class="dleboard" id="board"></div><div class="kbd" id="kbd"></div><p id="dleMsg" class="dlemsg"></p></div>
+        <div class="stack">
+          <div class="panel"><div class="ph"><h3>Your streak</h3></div><div id="dleStats"></div><button class="btn sm" id="dleShare"><svg class="ic"><use href="#i-copy"/></svg>Copy result for team chat</button></div>
+          <div class="panel"><div class="ph"><h3>Decode of the day</h3></div><div id="decode"></div></div>
+          <div class="panel"><div class="ph"><h3>How it works</h3></div><ul class="plain"><li><i class="sw g"></i>Right letter, right spot</li><li><i class="sw y"></i>Right letter, wrong spot</li><li><i class="sw x"></i>Not in the word</li></ul><p class="muted small">Any five-letter guess is allowed. A new word arrives at local midnight, with a short lesson once you finish.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BREAK ROOM -->
+    <section class="view" id="v-breakroom">
+      <div class="vh"><h1>The 60-second break room</h1><p>Pick one. Your queue will still be there. Unfortunately.</p></div>
+      <div class="seg tabs" id="tabs">
+        <button data-p="wrap" class="on">Alert bubble wrap</button><button data-p="breath">Handshake breathing</button><button data-p="smash">Smash the printer alert</button><button data-p="ff">False or true positive</button>
+      </div>
+      <div class="panel">
+        <div class="pane on" id="p-wrap"><p class="muted">Every bubble is a false positive. Pop them.</p><div class="wrapgrid" id="wrapgrid"></div><button class="btn" id="refill"><svg class="ic"><use href="#i-refresh"/></svg>The SIEM sent more</button></div>
+        <div class="pane" id="p-breath"><div class="breath"><div class="orb" id="orb">ready</div><p class="mono muted" id="pk">Press start</p><button class="btn primary" id="bstart"><svg class="ic"><use href="#i-play"/></svg>Start the handshake</button><p class="muted small">SYN, breathe in for 4. SYN-ACK, hold for 4. ACK, breathe out for 6. Three rounds.</p></div></div>
+        <div class="pane" id="p-smash"><div class="smash" id="smashzone"><button class="bigred" id="bigred" aria-label="Smash the printer alert"><svg class="ic"><use href="#i-printer"/></svg></button><p id="smashtxt" class="muted">Suspicious behaviour detected on PRINTER-3F-02. Again.</p></div></div>
+        <div class="pane" id="p-ff"><div class="ff"><div class="ffq" id="ffq"></div><button class="ffb" id="ffFP">False positive</button><button class="ffb" id="ffTP">True positive</button><div class="ffres" id="ffres"></div><button class="btn" id="ffnext">Next alert</button></div></div>
+      </div>
+      <div class="panel statsrow">
+        <div><b id="s-pop">0</b><span>false positives popped</span></div><div><b id="s-smash">0</b><span>printers smashed</span></div><div><b id="s-breath">0</b><span>handshakes</span></div>
+        <div><b id="s-phish">0</b><span>phish caught</span></div><div><b id="s-ffok">0</b><span>correct calls</span></div><div><b id="s-card">0</b><span>cards known</span></div>
+      </div>
+    </section>
+
+    <!-- SHIFT BUDDY -->
+    <section class="view" id="v-shift">
+      <div class="vh"><h1>Shift buddy</h1><p>A shift clock, break nudges, a start-of-shift checklist and a handover scratchpad.</p></div>
+      <div class="three">
+        <div class="panel"><div class="ph"><h3>Shift clock</h3></div><div class="bignum" id="shiftClock">--:--:--</div><div class="bar"><i id="shiftBar"></i></div><p class="muted" id="shiftInfo">Not on shift.</p><div class="seg" id="shiftLen"></div><button class="btn primary" id="shiftBtn">Start shift</button></div>
+        <div class="panel"><div class="ph"><h3>Nudges</h3><span class="muted">while this tab is open</span></div>
+          <div class="toggle">Eye break, every 20 minutes<button class="btn sm" data-n="eyes">off</button></div>
+          <div class="toggle">Drink some water, hourly<button class="btn sm" data-n="water">off</button></div>
+          <div class="toggle">Stand and stretch, every 90 minutes<button class="btn sm" data-n="stretch">off</button></div>
+          <div class="toggle">One 25-minute focus block<button class="btn sm" data-n="focus">off</button></div>
+          <p class="muted small">The tab title shows your shift time, so you can glance at it from any window.</p></div>
+        <div class="panel"><div class="ph"><h3>Start-of-shift checklist</h3><span class="muted" id="ckCount"></span></div><div id="checklist"></div>
+          <div class="row"><input class="search grow" id="ckNew" placeholder="Add your own item" aria-label="Add checklist item"><button class="btn sm" id="ckAdd">Add</button></div>
+          <button class="btn ghost sm" id="ckReset"><svg class="ic"><use href="#i-refresh"/></svg>Clear ticks for a new shift</button></div>
+      </div>
+      <div class="panel"><div class="ph"><h3>Handover scratchpad</h3><span class="muted">saved in this browser only</span></div>
+        <p class="warn">Don't paste real hostnames, IPs, usernames or case details. Treat this like a sticky note on a shared screen.</p>
+        <textarea id="pad" aria-label="Handover scratchpad"></textarea>
+        <div class="row"><button class="btn sm" id="padTpl">Insert handover template</button><button class="btn sm" id="padCopy"><svg class="ic"><use href="#i-copy"/></svg>Copy</button><button class="btn ghost sm" id="padClear"><svg class="ic"><use href="#i-trash"/></svg>Clear</button></div>
+      </div>
+    </section>
+
+    <!-- DETECTION LAB -->
+    <section class="view" id="v-detect">
+      <div class="vh"><h1>Detection lab</h1><p>Detections in KQL for Defender and Sentinel, SPL for Splunk, YARA-L 2.0 for Google SecOps and Sigma for everything else. Each one comes with the data it needs, triage steps, response actions, false positives and a tuning tip.</p></div>
+      <div class="filters"><input class="search" id="dlq" placeholder="Search: lsass, kerberos, T1053" aria-label="Search detections"><div class="seg" id="dlf"></div></div>
+      <div id="dlList"></div>
+      <p class="muted small">Test on historical data before enabling, and map field names to your own parsers. Sentinel tables, Splunk add-ons and SecOps UDM parsers differ between environments.</p>
+    </section>
+
+    <!-- ARCADE -->
+    <section class="view" id="v-arcade">
+      <div class="vh"><h1>Arcade</h1><p>Fast games that teach something. The same challenge code gives everyone the same round, so your whole team can compete. No accounts, no servers.</p></div>
+      <div class="seg tabs" id="gtabs"></div>
+      <div class="codebar">
+        <span class="muted">Challenge</span><span class="code" id="arcCode">…</span>
+        <button class="btn sm" id="arcCopy"><svg class="ic"><use href="#i-copy"/></svg>Invite team</button>
+        <button class="btn sm" id="arcDaily"><svg class="ic"><use href="#i-calendar"/></svg>Today's daily</button>
+        <button class="btn sm" id="arcNew"><svg class="ic"><use href="#i-dice"/></svg>New team challenge</button>
+        <span class="grow"></span>
+        <input class="search" id="arcIn" placeholder="Teammate's code, e.g. PD-7K3M9" maxlength="11" aria-label="Teammate's challenge code"><button class="btn sm" id="arcJoin">Join</button>
+      </div>
+      <div class="two">
+        <div class="panel cabinet"><div id="gameArea"></div></div>
+        <div class="stack">
+          <div class="panel"><div class="ph"><h3>Leaderboard</h3><span class="muted" id="lbTitle"></span></div><div id="lb"></div>
+            <textarea id="lbIn" class="short" placeholder="Paste teammates' result codes, one per line" aria-label="Teammates' result codes"></textarea>
+            <button class="btn sm" id="lbAdd"><svg class="ic"><use href="#i-plus"/></svg>Add to leaderboard</button>
+            <p class="muted small">Honour system: result codes aren't signed, so this is for bragging, not prizes.</p></div>
+          <div class="panel"><div class="ph"><h3>How to play</h3></div><p id="arcHow"></p>
+            <p class="muted small">Team mode: one person starts a new challenge and shares the code, everyone joins and plays, then you paste each other's result codes into the leaderboard.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TYCOON -->
+    <section class="view" id="v-tycoon">
+      <div class="vh"><h1>SOC tycoon</h1><p>Build the SOC you wish you worked in. It keeps triaging while this tab is open, and at a quarter speed for up to two hours while you're away. Milestones pay out beans.</p></div>
+      <div class="two">
+        <div class="panel" id="tyStage">
+          <div class="tyhead"><div><span class="muted">alerts triaged</span><div class="bignum" id="tyA">0</div></div><div><span class="muted">per second</span><div class="midnum" id="tyR">0/s</div></div><span class="boost" id="tyBoost" hidden></span></div>
+          <button class="tyclick" id="tyClick"><svg class="ic"><use href="#i-eye"/></svg><span>Triage an alert</span><b id="tyClickV">+1</b></button>
+          <h3 class="sub3">Hire</h3><div id="tyGens"></div>
+        </div>
+        <div class="stack">
+          <div class="panel"><div class="ph"><h3>Upgrades</h3></div><div id="tyUps" class="upgs"></div></div>
+          <div class="panel"><div class="ph"><h3>Post-incident review</h3></div><div id="tyPrestige"></div></div>
+          <p class="muted small">Golden alerts appear now and then while you're here; click one quickly for a boost. Same logic as a real SOC: automation multiplies people, tuning multiplies rules, and lessons learned make everything better.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SHOP -->
+    <section class="view" id="v-shop">
+      <div class="vh"><h1>Café shop</h1><p>Spend beans on hats for your buddy, themes, things for the tank and snacks. Beans can't be bought. Most of them come from taking care of yourself.</p></div>
+      <div class="panel wallet"><svg class="ic big"><use href="#i-bean"/></svg><div><span class="muted">your beans</span><div class="bignum" id="shopBeans">0</div></div></div>
+      <div class="panel machine"><div class="ph"><h3>Sticker capsule machine</h3></div><div class="mach" id="machine"></div></div>
+      <div id="shopList"></div>
+    </section>
+
+    <!-- MY CORNER -->
+    <section class="view" id="v-me">
+      <div class="vh"><h1>My corner</h1><p>Your level, badges, mood week and watchlist. It all lives in this browser: no account, nothing to leak.</p></div>
+      <div class="three">
+        <div class="panel"><div class="ph"><h3>Level</h3></div><div class="lvl"><div class="lvlnum" id="lvlEmoji">1</div><div><p class="lvltitle" id="lvlTitle"></p><p class="muted" id="lvlXp"></p></div></div><div class="bar"><i id="lvlBar"></i></div></div>
+        <div class="panel"><div class="ph"><h3>Your mood week</h3></div><div class="week" id="week"></div><p class="small" id="weekNote"></p></div>
+        <div class="panel"><div class="ph"><h3>Profile</h3><button class="btn ghost sm" id="editProf"><svg class="ic"><use href="#i-edit"/></svg>Edit</button></div><div id="profSum"></div></div>
+      </div>
+      <div class="two">
+        <div class="panel"><div class="ph"><h3>Visits</h3><span class="muted">last twelve weeks</span></div><div class="heat" id="heat"></div><p class="muted small" id="streakInfo"></p></div>
+        <div class="panel"><div class="ph"><h3>Fish dex</h3><span class="muted" id="dexCount"></span></div><div class="dexgrid" id="dex"></div></div>
+      </div>
+      <div class="panel"><div class="ph"><h3>Sticker album</h3><span class="muted" id="albumCount"></span><a class="link" href="#shop">Get capsules</a></div><div class="album" id="album"></div></div>
+      <div class="panel"><div class="ph"><h3>Badges</h3><span class="muted" id="bdgCount"></span></div><div class="badges" id="badges"></div></div>
+      <div class="panel"><div class="ph"><h3>CVE watchlist</h3><span class="muted">star cards on the CVE menu</span></div><div class="cards" id="watch"></div></div>
+      <div class="panel"><div class="ph"><h3>Your data</h3></div>
+        <p class="muted">Move your progress to another browser: copy it here, paste it there. Nothing touches a server.</p>
+        <div class="row"><button class="btn sm" id="expBtn"><svg class="ic"><use href="#i-upload"/></svg>Copy my data</button><button class="btn sm" id="impBtn"><svg class="ic"><use href="#i-download"/></svg>Import</button><button class="btn ghost sm" id="wipeBtn"><svg class="ic"><use href="#i-trash"/></svg>Erase everything</button></div>
+        <textarea id="impBox" class="short" placeholder="Paste exported data here, then press Import again" aria-label="Import data" hidden></textarea>
+      </div>
+    </section>
+
+    <footer>
+      <p>FP Café is built by a blue teamer for blue teamers. Static site: no logins, no cookies, no trackers, strict content security policy.</p>
+      <p>Data from CISA KEV, FIRST EPSS, NVD and vendor advisories (snapshot). Jokes made in house.</p>
+    </footer>
+  </main>
+</div>
+
+<div class="modal" id="onb" role="dialog" aria-modal="true" aria-labelledby="onbTitle"><div class="box">
+  <h2 id="onbTitle">Welcome to FP Café</h2>
+  <p class="muted">A few questions so your buddy, digest and queries fit you. Stored only in this browser. You can skip.</p>
+  <div class="field"><label class="l" for="oName">What should we call you?</label><input type="text" id="oName" maxlength="24" placeholder="A nickname, not your real username"></div>
+  <div class="field"><span class="l">Your role</span><div class="opt" id="oRole"></div></div>
+  <div class="field"><span class="l">Your SIEM</span><div class="opt" id="oSiem"></div></div>
+  <div class="field"><span class="l">What's in your stack? Pick any.</span><div class="opt" id="oStack"></div></div>
+  <div class="field"><span class="l">Humour</span><div class="opt" id="oHumor"></div></div>
+  <div class="field"><span class="l">Pick your buddy</span><div class="opt buddies" id="oBuddy"></div></div>
+  <div class="row"><button class="btn primary" id="oSave">Take a seat</button><button class="btn ghost" id="oSkip">Skip for now</button></div>
+</div></div>
+<div class="mibox" id="miBox" role="alertdialog" aria-live="assertive"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
