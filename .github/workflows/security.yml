@@ -16,6 +16,10 @@ jobs:
           persist-credentials: false
       - name: Site security checks
         run: ./scripts/check.sh
+      - name: Pipeline tests
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml && /usr/bin/python3 -m unittest discover -s pipeline/tests
+      - name: Backend tests
+        run: node --test backend/tests/*.test.mjs
   secret-scan:
     runs-on: ubuntu-latest
     steps:

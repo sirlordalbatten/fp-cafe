@@ -1,58 +1,98 @@
 # FP Café ☕
 
-**A break room for SOC analysts.** False positives, cold coffee, a CISO who yells, and tools you're allowed to swear at. It's built to stay open in a tab all shift: a split-flap board of the day's chaos, a desk of tickets to route (or bounce to IT), detections worth stealing, and games you can play against your team.
+**A break room for SOC analysts.** Live CVEs, malware families, fresh detections, AI-security news, games you can play against your team, and a shift buddy that keeps you sane. Everything refreshes on its own, and nothing gets typed in by hand.
 
 > Live: https://fp-cafe.pages.dev
 
 ## What's inside
-| Area | What it does |
-|---|---|
-| **Lounge** | Split-flap "days since last incident" board, an aquarium of live threats, a buddy who reacts to your mood, daily quests |
-| **The desk** | Tickets walk in all day. Work them, escalate them, or bounce them to IT and Network. The CISO notices. |
-| **Brew & menu** | CVE digest served as a café menu, with a coffee machine you can actually hear |
-| **Detections** | Copy-ready rules in KQL (Defender/Sentinel), SPL, YARA-L 2.0 (Google SecOps) and Sigma |
-| **Arcade** | Five security games with seeded challenge codes so a whole team plays the same round |
-| **Password lab** | Strength checker that explains *why*, a passphrase generator, and a "crack the user's password" game |
-| **SOCdle, tycoon, shop, sticker album** | Reasons to come back tomorrow |
+| Section | What it does | Freshness |
+|---|---|---|
+| **Lounge** | Split-flap arrivals board of newly exploited CVEs, a live threat radar, a ten-second brief, buddy, daily quests, mood check-in, pager ticker | every 3 h |
+| **The desk** | Tickets walk in while the tab is open. Route them, bounce them to IT or Network, keep the CISO calm, swear at your tools | generated from ~45 templates plus live CVEs and news |
+| **Morning brew** | A two-minute digest: three things to know, numbers for your manager, the latest headlines | every 3 h |
+| **CVE menu** | Every CISA KEV entry from the last 120 days plus new critical CVEs from NVD, scored with EPSS, filterable by your stack | every 3 h |
+| **Malware bar** | 32 curated family profiles (how it gets in, what you'll see, how to hunt it) with live activity from Malpedia, abuse.ch and news mentions | every 3 h |
+| **AI lab** | AI and MCP news, an interactive walkthrough of an AI agent triaging an alert through MCP tools (with a prompt-injection toggle), MCP explainer, AI-security glossary | every 3 h |
+| **Detection lab** | The newest rules from SigmaHQ, Splunk Security Content, Microsoft Sentinel and Google SecOps, plus curated playbooks with triage and tuning notes | every 3 h |
+| **Arcade** | Five games (Swipe the phish, Alert rush, Contain the worm, Needle in the logs, Firewall frenzy) with a daily challenge | |
+| **Leaderboards** | Global, team and daily boards, updated live, with server-side anti-cheat | live |
+| **SOCdle** | A daily five-letter security word, with a decode puzzle as a bonus round | daily |
+| **SOC tycoon** | Build a SOC: hire, automate, take client contracts, survive incidents, avoid burnout | |
+| **Password lab** | A strength checker that explains why, a passphrase generator, and a daily "crack a colleague" | daily |
+| **Shift buddy** | Custom shift hours (including overnight), break plan, essential nudges, a checklist with suggestions, a handover builder, and an analyst toolbox (time converter, defang, decode, hash ID) | |
+| **Snack lessons** | Hands-on micro-labs: spot the bad line, order the attack, match the event IDs. Includes a daily lab built from the newest KEV entry | daily |
+| **Pop incidents** | Short timed scenarios generated from templates and live data, so they rarely repeat | |
 
-Sound is synthesized live with the Web Audio API (no audio files), and only starts after you click something.
+Sound is synthesised in the browser with the Web Audio API (no audio files), and only starts after you click something.
+
+## Architecture
+```
+ GitHub Actions (every 3 h)                       Cloudflare Pages
+ ┌──────────────────────────┐   commit data   ┌──────────────────────────────┐
+ │ pipeline/refresh.py      │ ──────────────▶ │ site/        static front end │
+ │  CISA KEV · NVD · EPSS   │                 │ site/data/   validated JSON   │
+ │  Malpedia · abuse.ch     │                 │ functions/   /api/* (Workers) │──▶ D1 (SQLite)
+ │  RSS/Atom news + AI      │                 └──────────────────────────────┘    leaderboard
+ │  Sigma · Splunk · KQL ·  │                              ▲
+ │  YARA-L rule repos       │                              │ same origin only
+ └──────────────────────────┘                          browser
+```
+* **Front end**: plain ES modules, no framework and no build step. Each section loads only when you open it.
+* **Data pipeline**: Python standard library, plus PyYAML from Ubuntu's signed apt repository. It runs on GitHub's servers, so no server of mine is involved.
+* **Backend**: three tiny Pages Functions (`/api/run`, `/api/score`, `/api/board`) and a D1 database. It's only used for leaderboards.
 
 ## Security design
-The brief was "fully secured", so the design starts from **nothing to attack**:
+The brief was "fully secured", so the design starts from **as little as possible to attack**, and treats everything that does exist as hostile.
 
-- **No backend.** Static files on Cloudflare Pages. No server, database, API keys or login to steal.
-- **No third parties.** Fonts are self-hosted; no CDN, analytics script, ads or embeds. The CSP is `default-src 'none'` and only allows the site's own origin.
-- **No inline code.** Every script and style is an external file, so the CSP needs neither `'unsafe-inline'` nor `'unsafe-eval'`. Dynamic widths are set through the CSSOM rather than `style=""`.
-- **Untrusted input is treated as hostile.** Everything read back from localStorage, and every pasted team code, is validated against an allow-list before use.
-- **Hardened headers** (`site/_headers`): CSP, HSTS (preload), `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, a locked-down `Permissions-Policy`, COOP and CORP.
-- **CI on every push** (`.github/workflows/security.yml`): `scripts/check.sh` fails the build on inline scripts, inline handlers, inline styles, external resources, `eval`/`new Function`/`document.write`, missing headers, or an expired `security.txt`. Gitleaks scans the full history for secrets. Workflows run with read-only permissions, and Dependabot keeps the actions updated.
-- **Repo hygiene:** secret scanning and push protection on, private commit email, SSH key with a passphrase, 2FA.
-- **Disclosure:** `/.well-known/security.txt` (RFC 9116) and [SECURITY.md](SECURITY.md).
+**Browser**
+- Strict CSP: `default-src 'none'`. Scripts, styles and fonts come only from this site. The single third-party exception is Cloudflare's cookieless analytics beacon, which is allowed by exact hostname.
+- No inline scripts, styles or event handlers anywhere, so the CSP needs no `'unsafe-inline'` or `'unsafe-eval'`.
+- Every piece of data from the network or the user reaches the page through `textContent`. `innerHTML` is allowed only in a reviewed list of files that insert static art (`scripts/innerhtml-allowlist.txt`), and CI enforces that list.
+- Data is validated twice, once by the pipeline and again in the browser. Links are rendered only if they're `https://` and open with `noopener noreferrer`.
+- Headers: HSTS (preload), `frame-ancestors 'none'`, `X-Frame-Options: DENY`, COOP/CORP/COEP, `nosniff`, `Referrer-Policy: no-referrer`, a locked-down `Permissions-Policy`, and no wildcard CORS.
+
+**Data pipeline** (`pipeline/refresh.py`)
+- HTTPS only, and redirects to anything that isn't HTTPS are refused. Every download has a size cap and a timeout.
+- XML with a `DOCTYPE` or `ENTITY` declaration is rejected before parsing, which blocks entity-expansion attacks. YAML is parsed only with `safe_load`.
+- All text is stripped of markup, control characters and bidi overrides, then length-capped. Links are kept only for allow-listed hosts.
+- Rule repositories are blob-less, shallow clones. Only regular files inside the clone are read: symlinks are skipped, so a malicious upstream can't make the pipeline publish `/etc/passwd`. There's a test for this.
+- A failing source never wipes good data. The previous data is kept and marked "stale".
+- The commit step refuses to commit anything outside `site/data/`. Only that one job has write permission.
+
+**Leaderboard API** (`backend/core.mjs`)
+- No accounts, cookies or emails. Players opt in with a callsign. Team codes are stored as HMACs, and IP addresses only as salted hashes that rotate daily, used for rate limiting.
+- Scores can't simply be posted. A score is accepted only if:
+  1. the server signed a run token (HMAC) when the game started;
+  2. the token is unused (single-use);
+  3. the time between start and submit is plausible for that game;
+  4. the score is reachable in that time;
+  5. the client solved a proof-of-work bound to the token.
+- Per-IP rate limits, a same-origin check on every write, JSON only, 2 KB maximum body, allow-listed names, parameterised SQL, and generic errors.
+
+**Supply chain and CI**
+- No runtime dependencies at all. CI runs the site checks, pipeline tests and backend tests, gitleaks over the full history, and CodeQL. Dependabot keeps actions current.
+- `main` is protected against force-pushes and deletion. Secret scanning and push protection are on.
 
 ### Threat model
 | Threat | Mitigation |
 |---|---|
-| XSS via stored or pasted data | Allow-list validation on load; strict CSP blocks inline and external script even if something slips through |
-| Supply-chain compromise of a CDN or script | No third-party code at runtime, nothing to compromise |
-| Clickjacking | `frame-ancestors 'none'` + `X-Frame-Options: DENY` |
-| Downgrade / MITM | HSTS with preload, `upgrade-insecure-requests` |
-| Secret leaked in the repo | Nothing secret exists; gitleaks + GitHub push protection as backstops |
-| Malicious change to the site | Branch protection on `main`, CI must pass, build workstation is a hardened VM |
-| DDoS | Cloudflare's edge |
+| XSS via feed, rule or API data | Pipeline sanitising + browser re-validation + `textContent` rendering + strict CSP |
+| Poisoned upstream feed or rule repo | Size caps, XML entity refusal, `safe_load`, symlink refusal, schema validation, keep last-good data |
+| Fake leaderboard scores | Signed single-use run tokens, timing and score plausibility, proof-of-work, rate limits |
+| Cross-site abuse of the API | Same-origin check, no CORS headers, JSON-only, `frame-ancestors 'none'` |
+| Supply-chain compromise | No third-party runtime code; one analytics origin pinned by hostname |
+| Secret leaked in the repo | Nothing secret in code; gitleaks and push protection as backstops; runtime secrets live in Cloudflare and GitHub secrets |
+| Malicious change to the site | Protected `main`, CI on every push, the data job can only change `site/data/` |
+| Clickjacking / downgrade | `frame-ancestors 'none'`, HSTS preload |
+| DDoS / cost abuse | Cloudflare edge, per-IP limits, small fixed-size queries |
 
-### Build workstation
-Development happens on an isolated Ubuntu 22.04 VM: encrypted, NAT-only networking, unused virtual hardware removed, no listening services except local DNS, `ufw` deny-incoming, unattended security upgrades, and snapshots before risky changes.
-
-## Run locally
+## Run and test locally
 ```bash
-cd site && python3 -m http.server 8000
-```
-Then open http://localhost:8000. (The `_headers` file only applies on Cloudflare Pages; the meta CSP in `index.html` still applies locally.)
-
-## Check before you push
-```bash
-./scripts/check.sh
+./scripts/check.sh                                   # site security checks
+python3 -m unittest discover -s pipeline/tests       # pipeline tests (needs python3-yaml)
+node --test backend/tests/*.test.mjs                 # leaderboard logic tests
+cd site && python3 -m http.server 8000               # front end only (no leaderboard)
 ```
 
 ## Deploy
-Cloudflare Pages → connect this repo → **Build command:** none → **Build output directory:** `site`.
+See [SETUP.md](SETUP.md): Cloudflare Pages (build command: none, output: `site`), a D1 database, one secret, and an optional pair of API keys.

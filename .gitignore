@@ -10,3 +10,10 @@ Thumbs.db
 *.key
 id_*
 node_modules/
+
+# local dev
+.wrangler/
+.dev.vars
+wrangler.toml
+__pycache__/
+*.pyc

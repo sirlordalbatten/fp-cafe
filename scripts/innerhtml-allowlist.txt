@@ -1,0 +1,8 @@
+# Files allowed to assign innerHTML. Each was reviewed: they only insert
+# static SVG/markup written in this repo, with any text passed through esc().
+js/core.js
+js/views/desk.js
+js/views/pwlab.js
+js/views/shop.js
+js/views/me.js
+js/onboarding.js

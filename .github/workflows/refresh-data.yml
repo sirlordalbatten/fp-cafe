@@ -1,0 +1,46 @@
+name: refresh-data
+# Pulls fresh CVEs, malware intel, news, AI updates and detection rules,
+# validates them, and commits site/data/ when something changed.
+# Cloudflare Pages redeploys automatically on that commit.
+on:
+  schedule:
+    - cron: "11 */3 * * *"     # every 3 hours
+  workflow_dispatch: {}         # "Run workflow" button for a manual refresh
+permissions:
+  contents: read                # default for every job in this file
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write           # only this job may commit, and only data
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Install PyYAML from Ubuntu's signed repository
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
+      - name: Pipeline self-tests
+        run: /usr/bin/python3 -m unittest discover -s pipeline/tests
+      - name: Refresh data
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}           # optional, raises NVD rate limits
+          ABUSECH_AUTH_KEY: ${{ secrets.ABUSECH_AUTH_KEY }} # optional, enables ThreatFox/MalwareBazaar
+        run: /usr/bin/python3 pipeline/refresh.py --out site/data
+      - name: Validate output and site
+        run: |
+          /usr/bin/python3 pipeline/refresh.py --out site/data --validate
+          ./scripts/check.sh
+      - name: Commit data if it changed
+        run: |
+          git config user.name "fp-cafe-data[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/data/*.json
+          if git diff --cached --quiet; then echo "No changes."; exit 0; fi
+          # Safety net: this job may only ever change files in site/data/
+          if git diff --cached --name-only | grep -v '^site/data/'; then echo "Refusing: non-data change"; exit 1; fi
+          git commit -q -m "data: refresh $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q

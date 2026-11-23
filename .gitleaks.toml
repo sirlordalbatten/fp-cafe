@@ -1,0 +1,9 @@
+# Gitleaks config: default rules, plus an allowlist for public data the
+# refresh pipeline downloads (detection rules often contain strings that
+# look like secrets, such as example hashes and "password=" filters).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public data written by the refresh pipeline"
+paths = ['''^site/data/.*\.json$''']
