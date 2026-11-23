@@ -1,5 +1,5 @@
 Contact: https://github.com/sirlordalbatten/fp-cafe/security/advisories/new
 Expires: 2027-11-22T00:00:00.000Z
 Preferred-Languages: en
-Canonical: https://fpcafe.pages.dev/.well-known/security.txt
+Canonical: https://fp-cafe.pages.dev/.well-known/security.txt
 Policy: https://github.com/sirlordalbatten/fp-cafe/blob/main/SECURITY.md

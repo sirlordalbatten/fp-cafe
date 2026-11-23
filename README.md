@@ -2,7 +2,7 @@
 
 **A break room for SOC analysts.** False positives, cold coffee, a CISO who yells, and tools you're allowed to swear at. It's built to stay open in a tab all shift: a split-flap board of the day's chaos, a desk of tickets to route (or bounce to IT), detections worth stealing, and games you can play against your team.
 
-> Live: https://fpcafe.pages.dev
+> Live: https://fp-cafe.pages.dev
 
 ## What's inside
 | Area | What it does |
