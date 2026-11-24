@@ -90,7 +90,7 @@ function note(t) { const el = $("#deskNote"); if (el) typeText(el, t); }
 function renderQueue() {
   const box = $("#deskQueue"); if (!box) return; badge();
   $("#qInfo").textContent = q.length ? `${q.length} waiting · new ones arrive while this tab is open` : "empty, enjoy it while it lasts";
-  const fb = feedback.map((f) => h("div.verdict." + (f.ok ? "ok" : "no"), { role: "status" },
+  const fb = feedback.map((f) => h("div.verdict." + (f.ok ? "ok" : "no"), { role: "status", dataset: { id: f.id } },
     h("div.vd-head", h("b", f.ok ? "Right call" : "Not quite"), h("span.muted.small", ` · ${f.who}: "${f.msg.slice(0, 70)}${f.msg.length > 70 ? "…" : ""}"`),
       h("button.xbtn.sm", { "aria-label": "Dismiss", onclick: () => { feedback = feedback.filter((x) => x !== f); renderQueue(); } }, "×")),
     f.ok ? h("p", h("b", f.right), ". ", f.why) : [h("p", "You picked ", h("b", f.picked), ". The right call was ", h("b", f.right), "."), h("p", f.wrong ? f.wrong + " " : "", f.why)]));
@@ -110,6 +110,12 @@ function route(t, k) {
   const label = (x) => (ROUTES.find((r) => r[0] === x) || [x, x])[1];
   feedback.unshift({ id: t.id, ok, who: CAST[t.f].n, msg: t.m, picked: label(k), right: label(t.a), why: t.w, wrong: ok ? "" : WRONG[k] || "" });
   feedback = feedback.slice(0, 3);
+  const entry = feedback[0];
+  setTimeout(() => {   // verdicts clear themselves after 5 seconds
+    const el = document.querySelector(`.verdict[data-id="${entry.id}"]`);
+    if (el) { el.classList.add("leaving"); setTimeout(() => { feedback = feedback.filter((x) => x !== entry); renderQueue(); }, 350); }
+    else feedback = feedback.filter((x) => x !== entry);
+  }, 5000);
   if (ok) { earn(2, "ticket"); xp(6, "ticket"); ciso = Math.min(100, ciso + 5); sfx("coin"); note(`Right: ${label(t.a)}. ${t.w}`); }
   else {
     ciso = Math.max(0, ciso - 12); sting("fail"); note(`Not quite. You picked "${label(k)}", the right call was "${label(t.a)}". ${t.w}`);

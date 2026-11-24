@@ -506,3 +506,7 @@ details.det[open] .openhint::after{transform:rotate(-135deg) translateY(-2px)}
 .verdict .vd-head .xbtn{margin-left:auto}
 .verdict p{margin:4px 0;font-size:14.5px}
 #coffeeBtn.cooling{opacity:.6}
+
+/* pager: JS-driven scroll replaces the old CSS animation */
+.ticker .track.js{animation:none;padding-left:0;will-change:transform}
+.verdict.leaving{opacity:0;transform:translateY(-6px);transition:opacity .35s,transform .35s}

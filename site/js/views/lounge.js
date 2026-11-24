@@ -183,8 +183,27 @@ function ticker() {
   const tr = $("#ticker"); const heads = (news?.security || []).slice(0, 14);
   if (!heads.length) { tr.textContent = "Pager quiet. Suspiciously quiet."; return; }
   put(tr, heads.map((n, i) => [i ? h("span.sep", " ◆ ") : null, h("span.muted", n.s + ": "), ext(n.u, n.t, "tick-link")]));
-  // keep a calm reading speed (~45px a second) however many headlines there are
-  requestAnimationFrame(() => { tr.style.animationDuration = Math.max(60, Math.round(tr.scrollWidth / 45)) + "s"; });
+  scroll(tr);
+}
+
+// Pager scroll driven by JS at a fixed reading speed (px per second), whatever the length or screen size.
+let tickRaf = 0;
+function scroll(tr) {
+  cancelAnimationFrame(tickRaf);
+  const box = tr.parentElement; tr.classList.add("js");
+  const SPEED = RM ? 12 : 38;
+  let x = box.clientWidth, last = 0, paused = false;
+  box.onmouseenter = () => (paused = true); box.onmouseleave = () => (paused = false);
+  box.addEventListener("focusin", () => (paused = true)); box.addEventListener("focusout", () => (paused = false));
+  const step = (t) => {
+    tickRaf = requestAnimationFrame(step);
+    const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
+    if (paused || document.visibilityState !== "visible" || !tr.isConnected || !tr.offsetParent) return;
+    x -= SPEED * dt;
+    if (x < -tr.scrollWidth) x = box.clientWidth;
+    tr.style.transform = `translateX(${x.toFixed(1)}px)`;
+  };
+  tickRaf = requestAnimationFrame(step);
 }
 
 // ---------- horoscope ----------
