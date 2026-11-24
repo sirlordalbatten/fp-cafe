@@ -17,7 +17,18 @@ FX = os.path.join(HERE, "fixtures")
 
 def fx(name, mode="rb"):
     with open(os.path.join(FX, name), mode) as f:
-        return f.read()
+        data = f.read()
+    if name == "kev.json":
+        # Re-date the sample catalogue relative to today, so date-based counts never go stale.
+        import datetime as dt
+        doc = json.loads(data)
+        today = R.NOW.date()
+        for i, v in enumerate(doc["vulnerabilities"]):
+            if "dateAdded" in v:
+                v["dateAdded"] = (today - dt.timedelta(days=i)).isoformat()
+                v["dueDate"] = (today - dt.timedelta(days=i - 21)).isoformat()
+        data = json.dumps(doc).encode()
+    return data
 
 
 class Sanitising(unittest.TestCase):
