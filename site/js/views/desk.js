@@ -115,7 +115,7 @@ function route(t, k) {
     const el = document.querySelector(`.verdict[data-id="${entry.id}"]`);
     if (el) { el.classList.add("leaving"); setTimeout(() => { feedback = feedback.filter((x) => x !== entry); renderQueue(); }, 350); }
     else feedback = feedback.filter((x) => x !== entry);
-  }, 3000);
+  }, entry.ok ? 3000 : 5000);   // right: 3 s, wrong: 5 s (more to read)
   if (ok) { earn(2, "ticket"); xp(6, "ticket"); ciso = Math.min(100, ciso + 5); sfx("coin"); note(`Right: ${label(t.a)}. ${t.w}`); }
   else {
     ciso = Math.max(0, ciso - 12); sting("fail"); note(`Not quite. You picked "${label(k)}", the right call was "${label(t.a)}". ${t.w}`);

@@ -44,7 +44,7 @@ export async function mount(sec) {
       <div class="panel"><div class="ph"><h3>How are you, really?</h3></div><div class="moods" id="moods"></div><p class="muted small" id="moodReply"></p></div>
     </aside>
   </div>
-  <div class="pager"><span class="pager-label">Pager</span><div class="ticker"><div class="track" id="ticker">Loading headlines…</div></div><div class="pspeed" id="pspeed" role="group" aria-label="Pager speed"></div></div>`);
+  <div class="pager"><span class="pager-label">Pager</span><div class="ticker"><div class="track" id="ticker">Loading headlines…</div></div></div>`);
 
   $("#miDrill").addEventListener("click", () => drill());
   $("#flapRows").addEventListener("click", (e) => { const r = e.target.closest(".frow"); const c = r && cves.find((x) => x.id === r.dataset.id); if (c) detail(c); });
@@ -59,7 +59,7 @@ export async function mount(sec) {
   const [c, n, m] = await Promise.all([load("cves"), load("news"), load("malware")]);
   news = n; mal = m; stats = c ? c.stats : {};
   cves = cveList(c);
-  board(true); radar(); brief(); ticker(); pagerSpeedUI();
+  board(true); radar(); brief(); ticker();
   clearInterval(flapTimer);
   flapTimer = setInterval(() => { if (document.visibilityState === "visible" && location.hash.replace("#", "") === "lounge") { page++; board(true); } }, 60000);
 }
@@ -182,30 +182,27 @@ function brief() {
 function ticker() {
   const tr = $("#ticker"); const heads = (news?.security || []).slice(0, 14);
   if (!heads.length) { tr.textContent = "Pager quiet. Suspiciously quiet."; return; }
-  put(tr, heads.map((n, i) => [i ? h("span.sep", " ◆ ") : null, h("span.muted", n.s + ": "), ext(n.u, n.t, "tick-link")]));
+  const run = (copy) => h("span.run", { "aria-hidden": copy ? "true" : null }, heads.map((n) => [h("span.muted", n.s + ": "), copy ? h("span.tick-link", n.t) : ext(n.u, n.t, "tick-link"), h("span.sep", " ◆ ")]));
+  put(tr, run(false), run(true));   // two copies back to back = no empty gap when it loops
   scroll(tr);
 }
 
 // Pager scroll driven by JS at a fixed reading speed (px per second), whatever the length or screen size.
 let tickRaf = 0;
-const PAGER = { slow: 45, normal: 70, fast: 110 };
-function pagerSpeedUI() {
-  const box = $("#pspeed"); if (!box) return; const cur = store.get("pager", "normal");
-  put(box, Object.keys(PAGER).map((k) => h("button" + (k === cur ? ".on" : ""), { "aria-pressed": String(k === cur), title: `Pager speed: ${k}`, onclick: () => { store.set("pager", k); pagerSpeedUI(); } }, k)));
-}
 function scroll(tr) {
   cancelAnimationFrame(tickRaf);
   const box = tr.parentElement; tr.classList.add("js");
-  const speed = () => (RM ? 20 : PAGER[store.get("pager", "normal")] || PAGER.normal);
-  let x = box.clientWidth, last = 0, paused = false;
+  const SPEED = 90; // pixels per second. Deliberately not slowed by the OS "reduce animations" setting: a crawling pager is unreadable.
+  let x = 0, last = 0, paused = false;
   box.onmouseenter = () => (paused = true); box.onmouseleave = () => (paused = false);
   box.addEventListener("focusin", () => (paused = true)); box.addEventListener("focusout", () => (paused = false));
   const step = (t) => {
     tickRaf = requestAnimationFrame(step);
     const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
     if (paused || document.visibilityState !== "visible" || !tr.isConnected || !tr.offsetParent) return;
-    x -= speed() * dt;
-    if (x < -tr.scrollWidth) x = box.clientWidth;
+    const loop = tr.firstElementChild ? tr.firstElementChild.offsetWidth : tr.scrollWidth;
+    x -= SPEED * dt;
+    if (loop && x <= -loop) x += loop;
     tr.style.transform = `translateX(${x.toFixed(1)}px)`;
   };
   tickRaf = requestAnimationFrame(step);

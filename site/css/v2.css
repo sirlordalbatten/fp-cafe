@@ -510,6 +510,5 @@ details.det[open] .openhint::after{transform:rotate(-135deg) translateY(-2px)}
 /* pager: JS-driven scroll replaces the old CSS animation */
 .ticker .track.js{animation:none;padding-left:0;will-change:transform}
 .verdict.leaving{opacity:0;transform:translateY(-6px);transition:opacity .35s,transform .35s}
-.pspeed{display:flex;gap:2px;padding:0 8px;flex:none}
-.pspeed button{background:none;border:1px solid transparent;border-radius:4px;font:600 11px var(--mono);color:#47603A;padding:2px 6px}
-.pspeed button.on{border-color:#47603A;color:#1F2A17}
+.ticker .run{display:inline-block;white-space:nowrap}
+.ticker .run .sep{margin:0 14px}
