@@ -183,6 +183,8 @@ function ticker() {
   const tr = $("#ticker"); const heads = (news?.security || []).slice(0, 14);
   if (!heads.length) { tr.textContent = "Pager quiet. Suspiciously quiet."; return; }
   put(tr, heads.map((n, i) => [i ? h("span.sep", " ◆ ") : null, h("span.muted", n.s + ": "), ext(n.u, n.t, "tick-link")]));
+  // keep a calm reading speed (~45px a second) however many headlines there are
+  requestAnimationFrame(() => { tr.style.animationDuration = Math.max(60, Math.round(tr.scrollWidth / 45)) + "s"; });
 }
 
 // ---------- horoscope ----------

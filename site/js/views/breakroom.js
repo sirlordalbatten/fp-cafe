@@ -33,7 +33,7 @@ function pane(p) {
   } else if (p === "smash") {
     const txt = h("p.muted", "Suspicious behaviour detected on PRINTER-3F-02. Again.");
     const big = h("button.bigred", { "aria-label": "Smash the printer alert" }); big.append("SMASH");
-    big.addEventListener("click", () => { sfx("smash"); bump("smash"); statsUI(); txt.textContent = fresh("smash", SMASH); big.classList.remove("boom"); void big.offsetWidth; big.classList.add("boom"); });
+    big.addEventListener("click", () => { sfx("smash"); bump("smash"); statsUI(); txt.textContent = fresh("smash", SMASH); big.classList.remove("smashed"); void big.offsetWidth; big.classList.add("smashed"); });
     put(box, h("div.smash", big, txt));
   } else {
     const q = h("div.ffq.mono"), res = h("div.ffres", { "aria-live": "polite" }); let cur;

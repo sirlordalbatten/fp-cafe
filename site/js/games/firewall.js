@@ -23,7 +23,7 @@ export const FIREWALL = {
     const spawn = () => {
       const isBad = r() < 0.45; const label = isBad ? bad[Math.floor(r() * bad.length)] : good[Math.floor(r() * good.length)];
       g.font = "700 12px Atkinson, sans-serif"; const w = g.measureText(label).width + 22;
-      pk.push({ x: -w, y: 40 + r() * (H - 90), w, label, bad: isBad, v: 60 + r() * 50 + t * 2.2, dead: false });
+      pk.push({ x: -w, y: 40 + r() * (H - 90), w, label, bad: isBad, v: (45 + r() * 35 + t * 1.4) * ctx.speed, dead: false });
     };
     cv.addEventListener("pointerdown", (e) => {
       const b = cv.getBoundingClientRect(); const x = e.clientX - b.left, y = e.clientY - b.top;
@@ -35,7 +35,7 @@ export const FIREWALL = {
     const loop = (now) => {
       if (!alive) return; raf = requestAnimationFrame(loop);
       const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt; flash = Math.max(0, flash - dt * 2);
-      spawnIn -= dt; if (spawnIn <= 0) { spawn(); spawnIn = Math.max(0.28, 1.1 - t / 70) * (0.6 + r() * 0.8); }
+      spawnIn -= dt; if (spawnIn <= 0) { spawn(); spawnIn = (Math.max(0.45, 1.5 - t / 80) * (0.6 + r() * 0.8)) / ctx.speed; }
       const srvX = W - 70;
       if (W < 50 || H < 50) return;
       g.clearRect(0, 0, W, H);

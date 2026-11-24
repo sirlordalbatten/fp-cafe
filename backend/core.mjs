@@ -15,11 +15,11 @@
 
 export const GAMES = {
   //            min run   max run     score/sec  hard cap
-  phish:    { minMs: 15000, maxMs: 6 * 60e3, rate: 900, cap: 80000, label: "Swipe the phish" },
-  triage:   { minMs: 15000, maxMs: 8 * 60e3, rate: 1500, cap: 200000, label: "Alert rush" },
-  worm:     { minMs: 10000, maxMs: 30 * 60e3, rate: 600, cap: 300000, label: "Contain the worm" },
-  logs:     { minMs: 15000, maxMs: 6 * 60e3, rate: 1200, cap: 100000, label: "Needle in the logs" },
-  firewall: { minMs: 15000, maxMs: 6 * 60e3, rate: 1200, cap: 100000, label: "Firewall frenzy" },
+  phish:    { minMs: 15000, maxMs: 6 * 60e3, rate: 1350, cap: 120000, label: "Swipe the phish" },
+  triage:   { minMs: 15000, maxMs: 8 * 60e3, rate: 2250, cap: 300000, label: "Alert rush" },
+  worm:     { minMs: 10000, maxMs: 30 * 60e3, rate: 900, cap: 450000, label: "Contain the worm" },
+  logs:     { minMs: 15000, maxMs: 6 * 60e3, rate: 1800, cap: 150000, label: "Needle in the logs" },
+  firewall: { minMs: 15000, maxMs: 6 * 60e3, rate: 1800, cap: 150000, label: "Firewall frenzy" },
   socdle:   { minMs: 8000, maxMs: 6 * 3600e3, rate: 1, cap: 6, label: "SOCdle" },
 };
 

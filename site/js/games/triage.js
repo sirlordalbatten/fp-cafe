@@ -37,7 +37,7 @@ export const TRIAGE = {
     const spawn = () => {
       const a = pool();
       const el = h("div.alertcard", h("p.a-t", a.text), h("div.a-acts", ACT.map((l, i) => h("button.btn.sm.act" + i, { onclick: () => act(item, i) }, `${i + 1} ${l}`))));
-      const item = { ...a, el, y: -0.12, v: 0.055 + Math.min(0.09, t / 1400) + r() * 0.02 };
+      const item = { ...a, el, y: -0.15, v: (0.04 + Math.min(0.07, t / 1600) + r() * 0.012) * ctx.speed };
       lane.append(el); items.push(item);
     };
     const act = (item, k) => {
@@ -54,10 +54,15 @@ export const TRIAGE = {
     };
     const loop = (now) => {
       if (!alive) return; const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
-      spawnIn -= dt; if (spawnIn <= 0 && items.length < 6) { spawn(); spawnIn = Math.max(0.85, 2.3 - t / 50) * (0.7 + r() * 0.6); }
+      const travel = Math.max(120, lane.clientHeight - 72); const gapOf = (it) => ((it.el.offsetHeight || 78) + 10) / travel;
+      const topY = items.length ? Math.min(...items.map((x) => x.y)) : 1;
+      spawnIn -= dt; const topItem = items.length ? items.reduce((a, b) => (a.y < b.y ? a : b)) : null;
+      if (spawnIn <= 0 && (!topItem || topY > -0.15 + gapOf(topItem))) { spawn(); spawnIn = (Math.max(1.1, 2.7 - t / 55) * (0.7 + r() * 0.6)) / ctx.speed; }
+      // a real queue: each alert stops above the one below it, so cards never overlap
+      const order = items.slice().sort((a, b) => b.y - a.y);
+      order.forEach((it, i) => { it.y += it.v * dt * 1.6; if (i > 0) it.y = Math.min(it.y, order[i - 1].y - gapOf(it)); });
       for (const it of items.slice()) {
-        it.y += it.v * dt * 1.6;
-        it.el.style.transform = `translateY(${it.y * (lane.clientHeight - 70)}px)`;
+        it.el.style.transform = `translateY(${it.y * travel}px)`;
         if (it.y >= 1) {
           items = items.filter((x) => x !== it); it.el.classList.add("missed"); setTimeout(() => it.el.remove(), 400);
           lives--; ctx.lives(lives); ctx.add(-100); ctx.sting("fail"); why.textContent = `Missed: it should have been ${ACT[it.k]}. ${it.w}`;

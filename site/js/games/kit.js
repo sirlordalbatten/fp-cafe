@@ -4,6 +4,12 @@ import { sfx, sting, Snd } from "../audio.js";
 import { startRun, submit, getBoard, joinBoards } from "../board.js";
 import { profile, bump, earn, xp } from "../state.js";
 
+export const DIFFS = {
+  easy: { speed: 0.65, mult: 0.6, label: "Easy" },
+  normal: { speed: 0.85, mult: 1, label: "Normal" },
+  hard: { speed: 1.2, mult: 1.5, label: "Hard" },
+};
+export const getDiff = () => (DIFFS[store.get("diff", "normal")] ? store.get("diff", "normal") : "normal");
 export function bests() { return obj(store.get("best", {})); }
 function setBest(id, score, daily) {
   const b = bests(); const k = daily ? `${id}:${todayKey()}` : id;
@@ -15,6 +21,7 @@ function setBest(id, score, daily) {
  * game = { id, label, how, keys, duration?, start(ctx) -> stop() }
  */
 export async function play(area, game, { daily = false, onDone, onStart } = {}) {
+  const diffId = daily ? "normal" : getDiff(); const D = DIFFS[diffId];
   const run = startRun(game.id);  // fetch token in parallel with the countdown
   const seed = daily ? seedFrom(game.id + todayKey()) : seedFrom(game.id + Date.now() + rnd());
   const r = mulberry32(seed);
@@ -23,16 +30,16 @@ export async function play(area, game, { daily = false, onDone, onStart } = {}) 
   const bar = h("i"), timeBar = h("div.tbar", bar);
   const stage = h("div.stage", { tabindex: "0" });
   const fx = h("div.fx", { "aria-hidden": "true" });
-  const hud = h("div.hud", h("span.hn", game.label), daily ? h("span.pill.p-lav", "daily") : null, h("span.grow"), lives, hudCombo, hudTime, h("span.muted", "score "), hudScore);
+  const hud = h("div.hud", h("span.hn", game.label), daily ? h("span.pill.p-lav", "daily") : null, h("span.pill.p-unk", D.label), h("span.grow"), lives, hudCombo, hudTime, h("span.muted", "score "), hudScore);
   put(area, h("div.gamebox", hud, timeBar, h("div.stagewrap", stage, fx)));
   let score = 0, combo = 1, streak = 0, over = false, stop = () => {}, t0 = 0, raf = 0;
   const left = () => Math.max(0, game.duration ? game.duration - (performance.now() - t0) / 1000 : 0);
 
   const ctx = {
-    stage, r, daily,
+    stage, r, daily, speed: D.speed, diff: diffId,
     get score() { return score; }, get combo() { return combo; },
     add(points, x, y, label) {
-      const p = Math.round(points * (points > 0 ? combo : 1)); score = Math.max(0, score + p); hudScore.textContent = score.toLocaleString();
+      const p = Math.round(points * D.mult * (points > 0 ? combo : 1)); score = Math.max(0, score + p); hudScore.textContent = score.toLocaleString();
       if (points > 0) { streak++; if (streak % 4 === 0 && combo < 8) { combo++; sting("combo"); pop(`x${combo} combo`, null, null, "combo"); } }
       else { streak = 0; combo = 1; shake(); }
       hudCombo.textContent = combo > 1 ? `x${combo}` : "";
@@ -71,11 +78,11 @@ export async function play(area, game, { daily = false, onDone, onStart } = {}) 
     const status = h("p.muted.small", "");
     const boardBox = h("div.minib");
     put(area, h("div.results",
-      h("p.r-k", daily ? "Daily challenge" : "Game over"), h("h2.r-score", final.toLocaleString()),
+      h("p.r-k", daily ? "Daily challenge" : `Game over · ${D.label}`), h("h2.r-score", final.toLocaleString()),
       h("p", best ? "New personal best." : `Your best: ${num(bests()[daily ? `${game.id}:${todayKey()}` : game.id], 0).toLocaleString()}`), status,
       h("div.row.center",
         h("button.btn.primary", { onclick: () => play(area, game, { daily, onDone, onStart }) }, "Play again"),
-        h("button.btn", { onclick: () => copyText(`FP Café · ${game.label}${daily ? " (daily)" : ""}: ${final.toLocaleString()} points. Beat that: https://fp-cafe.pages.dev/#arcade`, "Score copied") }, "Share score"),
+        h("button.btn", { onclick: () => copyText(`FP Café · ${game.label}${daily ? " (daily)" : ` (${D.label})`}: ${final.toLocaleString()} points. Beat that: https://fp-cafe.pages.dev/#arcade`, "Score copied") }, "Share score"),
         h("button.btn.ghost", { onclick: () => onDone && onDone() }, "Back")),
       boardBox));
     const p = profile(); const tok = await run;

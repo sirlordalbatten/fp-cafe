@@ -55,7 +55,7 @@ export const LOGS = {
       while (term.children.length > 15) { const old = term.firstElementChild; if (old._bad && !old._hit) { ctx.add(-50); why.textContent = "Missed one: " + old.textContent.slice(9, 90) + "…"; } old.remove(); }
       term.scrollTop = term.scrollHeight;
       t += 1;
-      timer = setTimeout(add, Math.max(280, 720 - t * 5) * (0.75 + r() * 0.5));
+      timer = setTimeout(add, (Math.max(420, 1050 - t * 4) * (0.75 + r() * 0.5)) / ctx.speed);
     };
     const hit = (line) => {
       if (line._hit || !alive) return; line._hit = true;

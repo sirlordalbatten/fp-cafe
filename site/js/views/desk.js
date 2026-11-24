@@ -8,7 +8,7 @@ import { CAST, ROUTES, WRONG, CISO_LINES, CISO_STATES, CH_LABEL, CH_SOUND, TOOLS
 import { T, LIVE, VARS } from "../content/tickets.js";
 
 const MAX_Q = 6;
-let q = [], ciso = 70, arrive = 0;
+let q = [], ciso = 70, arrive = 0, feedback = [];
 
 function fill(s, extra = {}) { return s.replace(/\{(\w+)\}/g, (_, k) => extra[k] ?? (VARS[k] ? pick(VARS[k]) : k)); }
 function makeTicket() {
@@ -60,7 +60,11 @@ export async function mount(sec) {
   </div>
   <p class="muted small">Everyone at this desk is fictional. Tool statuses are jokes about the job, not real outage information.</p>`);
   load_();
+  coffeeUI(); setInterval(coffeeUI, 15000);
   $("#coffeeBtn").addEventListener("click", () => {
+    const wait = COFFEE_MS - (Date.now() - num(store.get("coffeeAt", 0), 0));
+    if (wait > 0) { note(`The machine is still refilling. Next coffee in ${Math.ceil(wait / 60e3)} min. Have some water.`); sfx("thud"); return; }
+    store.set("coffeeAt", Date.now()); coffeeUI();
     sfx2("coffee"); bump("coffee"); ciso = Math.min(100, ciso + 6); save(); renderCiso();
     const n = today().coffee || 1; note(n > 4 ? `Coffee number ${n}. Your heart rate is now a detection.` : pick(["Coffee made. The team's morale is up 6%.", "The machine gurgled ominously, then delivered.", "You made coffee for everyone. Even Brad the vendor."]));
     if (n === 1) earn(2, "coffee");
@@ -73,13 +77,25 @@ export async function mount(sec) {
 }
 export function show() { renderQueue(); renderStats(); }
 
+const COFFEE_MS = 30 * 60e3;
+function coffeeUI() {
+  const b = $("#coffeeBtn"); if (!b) return;
+  const wait = COFFEE_MS - (Date.now() - num(store.get("coffeeAt", 0), 0));
+  b.classList.toggle("cooling", wait > 0);
+  b.lastChild.textContent = wait > 0 ? `Refilling · ${Math.ceil(wait / 60e3)} min` : "Make a coffee";
+  b.title = "One coffee every 30 minutes. The machine has limits, and so do you.";
+}
 function note(t) { const el = $("#deskNote"); if (el) typeText(el, t); }
 
 function renderQueue() {
   const box = $("#deskQueue"); if (!box) return; badge();
   $("#qInfo").textContent = q.length ? `${q.length} waiting · new ones arrive while this tab is open` : "empty, enjoy it while it lasts";
-  if (!q.length) { put(box, h("p.empty", "Inbox zero. Nobody believes you, but well done.")); return; }
-  put(box, q.map((t) => {
+  const fb = feedback.map((f) => h("div.verdict." + (f.ok ? "ok" : "no"), { role: "status" },
+    h("div.vd-head", h("b", f.ok ? "Right call" : "Not quite"), h("span.muted.small", ` · ${f.who}: "${f.msg.slice(0, 70)}${f.msg.length > 70 ? "…" : ""}"`),
+      h("button.xbtn.sm", { "aria-label": "Dismiss", onclick: () => { feedback = feedback.filter((x) => x !== f); renderQueue(); } }, "×")),
+    f.ok ? h("p", h("b", f.right), ". ", f.why) : [h("p", "You picked ", h("b", f.picked), ". The right call was ", h("b", f.right), "."), h("p", f.wrong ? f.wrong + " " : "", f.why)]));
+  if (!q.length) { put(box, fb, h("p.empty", "Inbox zero. Nobody believes you, but well done.")); return; }
+  put(box, fb, q.map((t) => {
     const p = CAST[t.f]; const av = h("span.av"); av.innerHTML = avatar(p.a, 44);
     return h("article.ticket", { dataset: { id: t.id } },
       h("div.tk-head", av, h("div", h("b", p.n), h("span.muted", ` · ${p.t} · ${CH_LABEL[t.ch]}`), h("p.muted.small", p.q))),
@@ -91,9 +107,12 @@ function renderQueue() {
 function route(t, k) {
   q = q.filter((x) => x.id !== t.id);
   const ok = k === t.a; bump("tickets"); if (ok) bump("ticketsRight"); if (ok && (k === "it" || k === "net")) bump("bounced");
-  if (ok) { earn(2, "ticket"); xp(6, "ticket"); ciso = Math.min(100, ciso + 5); sfx("coin"); note(`${t.w}`); }
+  const label = (x) => (ROUTES.find((r) => r[0] === x) || [x, x])[1];
+  feedback.unshift({ id: t.id, ok, who: CAST[t.f].n, msg: t.m, picked: label(k), right: label(t.a), why: t.w, wrong: ok ? "" : WRONG[k] || "" });
+  feedback = feedback.slice(0, 3);
+  if (ok) { earn(2, "ticket"); xp(6, "ticket"); ciso = Math.min(100, ciso + 5); sfx("coin"); note(`Right: ${label(t.a)}. ${t.w}`); }
   else {
-    ciso = Math.max(0, ciso - 12); sting("fail"); note(`${WRONG[k] || "Hmm."} ${t.w}`);
+    ciso = Math.max(0, ciso - 12); sting("fail"); note(`Not quite. You picked "${label(k)}", the right call was "${label(t.a)}". ${t.w}`);
     if (ciso < 45) { sfx2("boss"); emit("ciso", { angry: true }); toast(`The CISO: "${pick(CISO_LINES)}"`); }
   }
   save(); renderQueue(); renderCiso(); renderStats();

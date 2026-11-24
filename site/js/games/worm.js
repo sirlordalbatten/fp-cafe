@@ -43,7 +43,7 @@ export const WORM = {
       }
       const ws = nodes.map((p, i) => [p, i]).filter(([p]) => p.t === "ws");
       const start = ws[Math.floor(r() * ws.length)][1]; nodes[start].inf = true;
-      budget = 3 + Math.floor(level / 2); tickEvery = Math.max(0.55, 1.35 - level * 0.1); tickT = tickEvery * 1.6;
+      budget = 3 + Math.floor(level / 2) + (ctx.diff === "easy" ? 1 : 0) - (ctx.diff === "hard" && level > 1 ? 1 : 0); tickEvery = Math.max(0.6, 1.5 - level * 0.1) / ctx.speed; tickT = tickEvery * 1.8;
       info.textContent = `Round ${level}. ${budget} isolations. The infection starts at the red host.`;
       ctx.lives(0);
     }

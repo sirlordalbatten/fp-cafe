@@ -1,6 +1,7 @@
 // Arcade: five games, a daily challenge everyone plays with the same seed, live leaderboards.
 import { $, h, html, put, icon, num, todayKey } from "../core.js";
-import { play, bests, mini } from "../games/kit.js";
+import { play, bests, mini, DIFFS, getDiff } from "../games/kit.js";
+import { store } from "../core.js";
 import { profile } from "../state.js";
 import { joinBoards } from "../board.js";
 import { PHISH } from "../games/phish.js";
@@ -38,6 +39,8 @@ function title() {
   $("#arcHow").textContent = g.how; $("#arcKeys").textContent = "Controls: " + g.keys;
   put(area, h("div.idle",
     h("h2", g.label), h("p.muted", g.duration ? `${g.duration} seconds` : "Rounds until the worm wins"),
+    h("div.seg.diffseg", { role: "group", "aria-label": "Difficulty" }, Object.entries(DIFFS).map(([k, d]) => h("button" + (k === getDiff() ? ".on" : ""), { "aria-pressed": String(k === getDiff()), onclick: () => { store.set("diff", k); title(); } }, d.label))),
+    h("p.muted.small", `${DIFFS[getDiff()].label}: speed ×${DIFFS[getDiff()].speed}, points ×${DIFFS[getDiff()].mult}. The daily challenge is always Normal, so everyone's comparable.`),
     h("div.row.center",
       h("button.btn.primary.big", { onclick: () => start(false) }, icon("play"), "Play"),
       h("button.btn.big", { onclick: () => start(true) }, icon("calendar"), "Today's daily")),
