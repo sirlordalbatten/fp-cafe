@@ -111,11 +111,11 @@ function route(t, k) {
   feedback.unshift({ id: t.id, ok, who: CAST[t.f].n, msg: t.m, picked: label(k), right: label(t.a), why: t.w, wrong: ok ? "" : WRONG[k] || "" });
   feedback = feedback.slice(0, 3);
   const entry = feedback[0];
-  setTimeout(() => {   // verdicts clear themselves after 5 seconds
+  setTimeout(() => {   // verdicts clear themselves after 3 seconds
     const el = document.querySelector(`.verdict[data-id="${entry.id}"]`);
     if (el) { el.classList.add("leaving"); setTimeout(() => { feedback = feedback.filter((x) => x !== entry); renderQueue(); }, 350); }
     else feedback = feedback.filter((x) => x !== entry);
-  }, 5000);
+  }, 3000);
   if (ok) { earn(2, "ticket"); xp(6, "ticket"); ciso = Math.min(100, ciso + 5); sfx("coin"); note(`Right: ${label(t.a)}. ${t.w}`); }
   else {
     ciso = Math.max(0, ciso - 12); sting("fail"); note(`Not quite. You picked "${label(k)}", the right call was "${label(t.a)}". ${t.w}`);

@@ -44,7 +44,7 @@ export async function mount(sec) {
       <div class="panel"><div class="ph"><h3>How are you, really?</h3></div><div class="moods" id="moods"></div><p class="muted small" id="moodReply"></p></div>
     </aside>
   </div>
-  <div class="pager"><span class="pager-label">Pager</span><div class="ticker"><div class="track" id="ticker">Loading headlines…</div></div></div>`);
+  <div class="pager"><span class="pager-label">Pager</span><div class="ticker"><div class="track" id="ticker">Loading headlines…</div></div><div class="pspeed" id="pspeed" role="group" aria-label="Pager speed"></div></div>`);
 
   $("#miDrill").addEventListener("click", () => drill());
   $("#flapRows").addEventListener("click", (e) => { const r = e.target.closest(".frow"); const c = r && cves.find((x) => x.id === r.dataset.id); if (c) detail(c); });
@@ -59,7 +59,7 @@ export async function mount(sec) {
   const [c, n, m] = await Promise.all([load("cves"), load("news"), load("malware")]);
   news = n; mal = m; stats = c ? c.stats : {};
   cves = cveList(c);
-  board(true); radar(); brief(); ticker();
+  board(true); radar(); brief(); ticker(); pagerSpeedUI();
   clearInterval(flapTimer);
   flapTimer = setInterval(() => { if (document.visibilityState === "visible" && location.hash.replace("#", "") === "lounge") { page++; board(true); } }, 60000);
 }
@@ -188,10 +188,15 @@ function ticker() {
 
 // Pager scroll driven by JS at a fixed reading speed (px per second), whatever the length or screen size.
 let tickRaf = 0;
+const PAGER = { slow: 45, normal: 70, fast: 110 };
+function pagerSpeedUI() {
+  const box = $("#pspeed"); if (!box) return; const cur = store.get("pager", "normal");
+  put(box, Object.keys(PAGER).map((k) => h("button" + (k === cur ? ".on" : ""), { "aria-pressed": String(k === cur), title: `Pager speed: ${k}`, onclick: () => { store.set("pager", k); pagerSpeedUI(); } }, k)));
+}
 function scroll(tr) {
   cancelAnimationFrame(tickRaf);
   const box = tr.parentElement; tr.classList.add("js");
-  const SPEED = RM ? 12 : 38;
+  const speed = () => (RM ? 20 : PAGER[store.get("pager", "normal")] || PAGER.normal);
   let x = box.clientWidth, last = 0, paused = false;
   box.onmouseenter = () => (paused = true); box.onmouseleave = () => (paused = false);
   box.addEventListener("focusin", () => (paused = true)); box.addEventListener("focusout", () => (paused = false));
@@ -199,7 +204,7 @@ function scroll(tr) {
     tickRaf = requestAnimationFrame(step);
     const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
     if (paused || document.visibilityState !== "visible" || !tr.isConnected || !tr.offsetParent) return;
-    x -= SPEED * dt;
+    x -= speed() * dt;
     if (x < -tr.scrollWidth) x = box.clientWidth;
     tr.style.transform = `translateX(${x.toFixed(1)}px)`;
   };
