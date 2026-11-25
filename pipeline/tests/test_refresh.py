@@ -252,3 +252,48 @@ class Validation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NewSources(unittest.TestCase):
+    def test_kev_refs(self):
+        refs = R.kev_refs("https://fortiguard.example.com/psirt/FG-IR-26-001 ; https://nvd.nist.gov/vuln/detail/CVE-2026-1 ; javascript:alert(1) ; http://plain.example/x")
+        self.assertEqual(refs, ["https://fortiguard.example.com/psirt/FG-IR-26-001"])
+
+    def test_ransomware_aggregates_never_store_victims(self):
+        import datetime as dt
+        today = R.NOW.date()
+        victims = [{"victim": "Secret Victim Corp", "group": "akira", "attackdate": str(today - dt.timedelta(days=i % 40)),
+                    "country": "SG" if i % 2 else "US", "activity": "Healthcare" if i % 3 else "Manufacturing"} for i in range(60)]
+        victims.append({"victim": "x", "group": "<script>", "attackdate": str(today)})
+        with mock.patch.object(R, "http_get", return_value=json.dumps(victims).encode()), mock.patch.object(R.time, "sleep"):
+            d = R.build_ransomware({})
+        R.validate("ransomware", d)
+        blob = json.dumps(d)
+        self.assertNotIn("Secret Victim", blob)
+        self.assertNotIn("<script>", blob)
+        self.assertEqual(d["groups30"][0][0], "akira")
+        self.assertEqual(len(d["daily"]), 30)
+
+    def test_ransomware_failure_keeps_previous(self):
+        prev = {"generated": "x", "groups7": [["akira", 3]], "total7": 3}
+        with mock.patch.object(R, "http_get", side_effect=IOError("down")), mock.patch.object(R.time, "sleep"):
+            d = R.build_ransomware(prev)
+        self.assertEqual(d["status"]["ransomware.live"], "stale")
+        self.assertEqual(d["groups7"], [["akira", 3]])
+
+    def test_mcp_registry_both_shapes(self):
+        page = {"servers": [
+            {"server": {"name": "io.github.acme/siem-mcp", "description": "Query <b>SIEM</b>", "version": "1.2.0",
+                        "repository": {"url": "https://github.com/acme/siem-mcp"}, "packages": [{"registryType": "npm"}]},
+             "_meta": {"io.modelcontextprotocol.registry/official": {"updatedAt": "2026-11-20T10:00:00Z", "isLatest": True, "status": "active"}}},
+            {"name": "io.github.old/thing", "description": "old shape", "version": "0.1", "repository": {"url": "javascript:alert(1)"},
+             "_meta": {"io.modelcontextprotocol.registry/official": {"published_at": "2026-11-21T10:00:00Z"}}},
+            {"server": {"name": "io.github.x/deleted"}, "_meta": {"io.modelcontextprotocol.registry/official": {"updatedAt": "2026-11-22T10:00:00Z", "status": "deleted"}}},
+        ], "metadata": {}}
+        with mock.patch.object(R, "http_get", return_value=json.dumps(page).encode()), mock.patch.object(R.time, "sleep"):
+            items, st = R.build_mcp([])
+        self.assertEqual(st, "ok")
+        self.assertEqual([i["t"] for i in items], ["io.github.old/thing", "io.github.acme/siem-mcp"])
+        self.assertIsNone(items[0]["u"])
+        self.assertNotIn("<b>", items[1]["x"])
+        R.validate("news", {"generated": "x", "security": [], "ai": [], "soc": [], "mcp": items})

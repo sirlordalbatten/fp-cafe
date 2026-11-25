@@ -7,10 +7,10 @@ import { LESSONS } from "../content/lessons.js";
 import { EVENTS, SYSMON, LOGONS, ATTACK } from "../content/legacy.js";
 
 const done = () => new Set(arr(store.get("lessonsDone", [])));
-let tab = "labs";
+let tab = "labs", topic = "All";
 
 export async function mount(sec) {
-  html(sec, `<div class="vh"><h1>Snack lessons</h1><p>Three-minute hands-on labs. Spot the bad line, put the attack in order, match the event IDs. No slides, no lectures.</p></div>
+  html(sec, `<div class="vh"><h1>Snack lessons</h1><p>Three-minute hands-on labs from real SOC work: BEC, OAuth consent, CloudTrail, KQL, Linux logs, ransomware's first hour and more. Spot the bad line, put the response in order, match the event IDs. Plus one lab built from today's exploited CVE.</p></div>
   <div class="seg tabs" id="ltabs"><button data-p="labs" class="on">Labs</button><button data-p="cheat">Cheat sheets</button><button data-p="cards">ATT&amp;CK flashcards</button></div>
   <div id="lpane"></div>`);
   $("#ltabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.p; [...$("#ltabs").children].forEach((x) => x.classList.toggle("on", x === b)); pane(); });
@@ -34,7 +34,8 @@ async function labs() {
   put(box,
     h("div.panel.lesson-next", h("div.ph", h("h3", d.has(next.id) ? "Revisit" : "Up next"), h("span.muted", `${d.size} of ${LESSONS.length} labs done`)),
       h("p", h("b", next.t)), h("p.muted.small", `${next.topic} · ${next.steps.length} steps`), h("button.btn.primary", { onclick: () => player(next) }, "Start")),
-    h("div.cards.lessons", list.map((l) => h("button.lcard" + (d.has(l.id) ? ".done" : ""), { onclick: () => player(l) },
+    h("div.seg.wraptabs.ltopics", ["All", ...new Set(list.map((l) => l.topic))].map((tp) => h("button" + (tp === topic ? ".on" : ""), { onclick: () => { topic = tp; labs(); } }, tp))),
+    h("div.cards.lessons", list.filter((l) => topic === "All" || l.topic === topic).map((l) => h("button.lcard" + (d.has(l.id) ? ".done" : ""), { onclick: () => player(l) },
       h("span.pill.p-unk", l.topic), h("b", l.t), h("span.muted.small", d.has(l.id) ? "done, play again" : `${l.steps.length} steps`)))));
 }
 

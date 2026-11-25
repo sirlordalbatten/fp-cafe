@@ -260,6 +260,23 @@ AI_FEEDS = [
     ("Ollama", "https://github.com/ollama/ollama/releases.atom", ["github.com"]),
 ]
 
+SOC_FEEDS = [
+    ("Red Canary", "https://redcanary.com/feed/", ["redcanary.com"]),
+    ("Expel", "https://expel.com/feed/", ["expel.com"]),
+    ("Huntress", "https://www.huntress.com/blog/rss.xml", ["huntress.com"]),
+    ("Elastic Security Labs", "https://www.elastic.co/security-labs/rss/feed.xml", ["elastic.co"]),
+    ("The DFIR Report", "https://thedfirreport.com/feed/", ["thedfirreport.com"]),
+    ("Microsoft Security", "https://www.microsoft.com/en-us/security/blog/feed/", ["microsoft.com"]),
+    ("Google Security Blog", "https://security.googleblog.com/feeds/posts/default", ["security.googleblog.com", "googleblog.com"]),
+    ("SANS Blog", "https://www.sans.org/blog/feed.xml", ["sans.org"]),
+]
+SOC_TAGS = [
+    ("detection", re.compile(r"detect|hunt|rule|sigma|query|telemetry", re.I)),
+    ("ir", re.compile(r"incident|respon|intrusion|ransom|breach|forensic", re.I)),
+    ("practice", re.compile(r"soc\b|analyst|team|metric|automation|playbook|triage|burnout|on-?call", re.I)),
+    ("threat", re.compile(r"actor|apt|campaign|malware|exploit", re.I)),
+]
+
 AI_TAGS = [
     ("mcp", re.compile(r"\bmcp\b|model context protocol", re.I)),
     ("agents", re.compile(r"\bagent(s|ic)?\b|computer use|tool use", re.I)),
@@ -322,6 +339,19 @@ EDGE_RX = re.compile(
     r"zyxel|draytek|juniper|junos|cyberoam|sophos firewall|check point|connect secure|policy secure", re.I)
 
 
+def kev_refs(notes) -> list[str]:
+    """Vendor advisory links from KEV's notes field (https only, NVD link dropped as we add our own)."""
+    out = []
+    for u in re.findall(r"https://[^\s;,]+", str(notes or ""))[:8]:
+        u = u.rstrip(").")
+        if "nvd.nist.gov" in u:
+            continue
+        ok = safe_url(u, "*")
+        if ok and ok not in out:
+            out.append(ok)
+    return out[:3]
+
+
 def build_kev(raw) -> list[dict]:
     vulns = raw.get("vulnerabilities") if isinstance(raw, dict) else None
     if not isinstance(vulns, list) or len(vulns) < 100:
@@ -345,6 +375,7 @@ def build_kev(raw) -> list[dict]:
             "due": day(v.get("dueDate")),
             "ransomware": str(v.get("knownRansomwareCampaignUse", "")).lower() == "known",
             "cwe": [clean(c, 16) for c in (v.get("cwes") or [])[:3] if re.match(r"^CWE-\d+$", str(c))],
+            "refs": kev_refs(v.get("notes")),
         })
     out.sort(key=lambda x: x["added"], reverse=True)
     return out
@@ -636,6 +667,109 @@ def build_malware(prev: dict, news_items: list[dict]) -> dict:
 
 
 # --------------------------------------------------------------------------
+# Ransomware activity (ransomware.live, free public API). Aggregates only:
+# we never store or publish victim names.
+# --------------------------------------------------------------------------
+RL = "https://api.ransomware.live/v2"
+GROUP_RE = re.compile(r"^[a-z0-9][a-z0-9 ._-]{0,40}$")
+
+
+def _victim_fields(v) -> tuple[str, str | None, str, str]:
+    g = str(v.get("group") or v.get("group_name") or "").strip().lower()
+    d = day(v.get("attackdate") or v.get("discovered") or v.get("published") or v.get("date"))
+    sec = clean(v.get("activity") or v.get("sector") or "", 40)
+    cc = str(v.get("country") or "").strip().upper()
+    return g, d, sec, cc if re.match(r"^[A-Z]{2}$", cc) else ""
+
+
+def build_ransomware(prev: dict) -> dict:
+    victims, ok = [], 0
+    months = {(NOW.year, NOW.month), ((NOW - dt.timedelta(days=31)).year, (NOW - dt.timedelta(days=31)).month)}
+    for y, m in sorted(months):
+        try:
+            raw = get_json(f"{RL}/victims/{y}/{m:02d}", max_bytes=30_000_000, timeout=90)
+            items = raw if isinstance(raw, list) else raw.get("victims") or raw.get("data") or []
+            victims += [x for x in items if isinstance(x, dict)]
+            ok += 1
+        except Exception as e:  # noqa: BLE001
+            log(f"[ransomware] {y}-{m:02d}: {type(e).__name__}: {str(e)[:120]}")
+        time.sleep(1.5)
+    if not ok or not victims:
+        keep = {k: v for k, v in prev.items() if k != "generated"}
+        return {"generated": iso(NOW), **keep, "status": {"ransomware.live": "stale" if keep.get("groups7") else "failed"}}
+    today = NOW.date()
+    g7, g30, sec30, cc30, daily = {}, {}, {}, {}, {}
+    for v in victims:
+        g, d, sec, cc = _victim_fields(v)
+        if not d or not GROUP_RE.match(g):
+            continue
+        age = (today - dt.date.fromisoformat(d)).days
+        if age < 0 or age > 30:
+            continue
+        g30[g] = g30.get(g, 0) + 1
+        if age <= 7:
+            g7[g] = g7.get(g, 0) + 1
+        if sec:
+            sec30[sec] = sec30.get(sec, 0) + 1
+        if cc:
+            cc30[cc] = cc30.get(cc, 0) + 1
+        daily[d] = daily.get(d, 0) + 1
+    top = lambda m, n: [[k, v] for k, v in sorted(m.items(), key=lambda x: -x[1])[:n]]
+    days = [(today - dt.timedelta(days=i)).isoformat() for i in range(29, -1, -1)]
+    return {"generated": iso(NOW), "status": {"ransomware.live": "ok"},
+            "total7": sum(g7.values()), "total30": sum(g30.values()), "groups7": top(g7, 15), "groups30": top(g30, 20),
+            "sectors30": top(sec30, 10), "countries30": top(cc30, 12), "daily": [[d, daily.get(d, 0)] for d in days]}
+
+
+# --------------------------------------------------------------------------
+# MCP registry: newest published servers (official registry, no key)
+# --------------------------------------------------------------------------
+MCP_REG = "https://registry.modelcontextprotocol.io/v0/servers"
+
+
+def build_mcp(prev_items: list) -> tuple[list, str]:
+    found, cursor = [], None
+    try:
+        for _ in range(4):
+            q = {"limit": 100}
+            if cursor:
+                q["cursor"] = cursor
+            raw = get_json(f"{MCP_REG}?{urllib.parse.urlencode(q)}", timeout=60)
+            for entry in raw.get("servers") or []:
+                srv = entry.get("server") if isinstance(entry.get("server"), dict) else entry
+                meta = (entry.get("_meta") or srv.get("_meta") or {})
+                off = meta.get("io.modelcontextprotocol.registry/official") or meta.get("io.modelcontextprotocol.registry") or {}
+                when = off.get("updatedAt") or off.get("updated_at") or off.get("publishedAt") or off.get("published_at")
+                if off.get("isLatest") is False or str(off.get("status", "active")).lower() not in ("active", ""):
+                    continue
+                name = clean(srv.get("name"), 120)
+                repo = srv.get("repository") or {}
+                url = safe_url(repo.get("url") if isinstance(repo, dict) else None, ["github.com", "gitlab.com"]) or None
+                if not name or not when:
+                    continue
+                found.append({"t": name, "x": clean(srv.get("description"), 220), "v": clean(srv.get("version"), 30),
+                              "u": url, "d": iso(parse_date(when)) or iso(NOW), "remote": bool(srv.get("remotes")),
+                              "pkg": clean(",".join(sorted({str(p.get("registryType") or p.get("registry_type") or "")
+                                                             for p in (srv.get("packages") or []) if isinstance(p, dict)} - {""})), 40)})
+            cursor = (raw.get("metadata") or {}).get("nextCursor") or (raw.get("metadata") or {}).get("next_cursor")
+            if not cursor:
+                break
+            time.sleep(0.5)
+        if not found:
+            raise ValueError("no servers parsed")
+    except Exception as e:  # noqa: BLE001
+        log(f"[mcp] registry: {type(e).__name__}: {str(e)[:150]}")
+        return prev_items, ("stale" if prev_items else "failed")
+    seen, out = set(), []
+    for it in sorted(found, key=lambda x: x["d"], reverse=True):
+        if it["t"] in seen:
+            continue
+        seen.add(it["t"])
+        out.append(it)
+    return out[:40], "ok"
+
+
+# --------------------------------------------------------------------------
 # Detection rules from public repositories
 # --------------------------------------------------------------------------
 DET_SOURCES = [
@@ -882,6 +1016,8 @@ def validate(kind: str, data: dict) -> None:
                 _check_str(k[f], n, "kev." + f)
             if not isinstance(k["ransomware"], bool):
                 raise Invalid("kev.ransomware")
+            for u in k.get("refs", []):
+                _check_url(u, "kev.refs")
         for k in data["nvd"]:
             if not CVE_RE.match(k["id"]):
                 raise Invalid("nvd id")
@@ -892,10 +1028,20 @@ def validate(kind: str, data: dict) -> None:
             if not CVE_RE.match(cid) or not (isinstance(v, list) and len(v) == 2):
                 raise Invalid("epss")
     elif kind == "news":
-        for grp in ("security", "ai"):
-            for i in data[grp]:
+        for grp in ("security", "ai", "soc"):
+            for i in data.get(grp, []):
                 _check_item(i, grp)
                 _check_str(i.get("x", ""), 260, grp + ".x")
+        for m in data.get("mcp", []):
+            _check_str(m.get("t"), 120, "mcp.t", False)
+            _check_str(m.get("x", ""), 220, "mcp.x")
+            _check_url(m.get("u"), "mcp.u")
+    elif kind == "ransomware":
+        for k in ("groups7", "groups30", "sectors30", "countries30", "daily"):
+            for pair in data.get(k, []):
+                if not (isinstance(pair, list) and len(pair) == 2 and isinstance(pair[0], str) and isinstance(pair[1], int)):
+                    raise Invalid("ransomware." + k)
+                _check_str(pair[0], 60, "ransomware." + k)
     elif kind == "malware":
         for fid, f in data["families"].items():
             if not FAMILY_ID.match(fid):
@@ -949,12 +1095,12 @@ def write(out_dir: str, name: str, data: dict) -> None:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(HERE, "..", "site", "data"))
-    ap.add_argument("--only", choices=["cves", "news", "malware", "detections"], action="append")
+    ap.add_argument("--only", choices=["cves", "news", "malware", "detections", "ransomware"], action="append")
     ap.add_argument("--validate", action="store_true", help="only validate existing files")
     a = ap.parse_args(argv)
     out = os.path.abspath(a.out)
     os.makedirs(out, exist_ok=True)
-    kinds = a.only or ["news", "cves", "malware", "detections"]
+    kinds = a.only or ["news", "cves", "malware", "detections", "ransomware"]
 
     if a.validate:
         bad = 0
@@ -976,7 +1122,9 @@ def main(argv=None) -> int:
     if "news" in kinds or "malware" in kinds:
         sec, s1 = fetch_feeds(NEWS_FEEDS, news_prev.get("security", []), SEC_TAGS, "news")
         ai, s2 = fetch_feeds(AI_FEEDS, news_prev.get("ai", []), AI_TAGS, "ai")
-        news = {"generated": iso(NOW), "status": {**s1, **s2}, "security": sec, "ai": ai}
+        soc, s3 = fetch_feeds(SOC_FEEDS, news_prev.get("soc", []), SOC_TAGS, "soc")
+        mcp, s4 = build_mcp(news_prev.get("mcp", []))
+        news = {"generated": iso(NOW), "status": {**s1, **s2, **s3, "MCP registry": s4}, "security": sec, "ai": ai, "soc": soc, "mcp": mcp}
         if "news" in kinds:
             results["news"] = news
     if "cves" in kinds:
@@ -985,6 +1133,8 @@ def main(argv=None) -> int:
         results["malware"] = build_malware(load_prev(out, "malware"), (news or {}).get("security", []))
     if "detections" in kinds:
         results["detections"] = build_detections(load_prev(out, "detections"))
+    if "ransomware" in kinds:
+        results["ransomware"] = build_ransomware(load_prev(out, "ransomware"))
 
     failed = 0
     for name, data in results.items():

@@ -8,9 +8,11 @@
 <meta name="color-scheme" content="dark">
 <meta name="description" content="A break room for SOC analysts: live CVEs, malware families, detections, AI security news, and games to play with your team.">
 <title>FP Café</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/v2.css">
+<link rel="stylesheet" href="css/v3.css">
 <script type="module" src="js/main.js"></script>
 </head>
 <body>
@@ -99,6 +101,8 @@
     <a href="#malware" data-v="malware"><svg class="ic"><use href="#i-bug"/></svg>Malware bar</a>
     <a href="#ai" data-v="ai"><svg class="ic"><use href="#i-bot"/></svg>AI lab<span class="dot" id="aiNew" hidden></span></a>
     <a href="#detect" data-v="detect"><svg class="ic"><use href="#i-detect"/></svg>Detection lab</a>
+    <a href="#playbook" data-v="playbook"><svg class="ic"><use href="#i-book"/></svg>SOC playbook</a>
+    <a href="#phishsim" data-v="phishsim"><svg class="ic"><use href="#i-hook"/></svg>Phish sim</a>
     <p class="navh">Off the clock</p>
     <a href="#arcade" data-v="arcade"><svg class="ic"><use href="#i-arcade"/></svg>Arcade</a>
     <a href="#boards" data-v="boards"><svg class="ic"><use href="#i-fame"/></svg>Leaderboards</a>
@@ -137,6 +141,8 @@
     </header>
     <section class="view" id="v-lounge" aria-label="lounge"></section>
     <section class="view" id="v-desk" aria-label="desk"></section>
+    <section class="view" id="v-playbook" aria-label="playbook"></section>
+    <section class="view" id="v-phishsim" aria-label="phishsim"></section>
     <section class="view" id="v-brew" aria-label="brew"></section>
     <section class="view" id="v-menu" aria-label="menu"></section>
     <section class="view" id="v-malware" aria-label="malware"></section>

@@ -1,16 +1,17 @@
 // CVE menu: every exploited and critical CVE from the last few months, refreshed every 3 hours.
 import { $, h, html, put, ago, store, on } from "../core.js";
 import { load, cveList, classics, newSince, statusLine } from "../data.js";
-import { card, isEdge, watchlist } from "../cvecard.js";
+import { card, detail, isEdge, watchlist } from "../cvecard.js";
 import { profile } from "../state.js";
 
-const FILTERS = [["all", "All"], ["kev", "Exploited"], ["ran", "Ransomware"], ["crit", "Critical"], ["edge", "Edge devices"], ["mine", "My stack"], ["watch", "Watchlist"]];
+const FILTERS = [["all", "All"], ["week", "This week"], ["kev", "Exploited"], ["ran", "Ransomware"], ["crit", "Critical"], ["edge", "Edge devices"], ["mine", "My stack"], ["watch", "Watchlist"]];
 const SORTS = [["heat", "Hottest"], ["new", "Newest"], ["epss", "Most likely exploited"], ["cvss", "Highest CVSS"]];
 let list = [], filter = "all", sort = "heat", query = "", shown = 24, fresh = new Set(), mark = () => {};
 
 export async function mount(sec) {
   html(sec, `<div class="vh"><h1>The CVE menu</h1><p>Every known-exploited and critical CVE from the last few months, refreshed every three hours. Each dish comes with a roast and the grown-up advice.</p></div>
   <p class="muted small" id="menuStatus"></p>
+  <section class="panel patchfirst" aria-labelledby="pfH"><div class="ph"><h3 id="pfH">Patch first</h3><span class="muted small">Exploited in the wild, newest and most dangerous first. Ransomware use and internet-facing devices jump the queue.</span></div><ol class="pf" id="pfList"></ol></section>
   <div class="filters"><input class="search" id="mq" type="search" placeholder="Search CVE, vendor or product" aria-label="Search the menu">
     <div class="seg" id="mf" role="group" aria-label="Filter"></div><label class="sortl">Sort <select id="ms"></select></label></div>
   <div class="cards" id="menuList"></div>
@@ -28,7 +29,15 @@ export async function mount(sec) {
   list = cveList(c);
   $("#menuStatus").textContent = c?.generated ? `${list.length} CVEs · refreshed ${ago(c.generated)} · sources: CISA KEV, NVD, FIRST EPSS. ${statusLine(c)}` : statusLine(c);
   const ns = newSince("menu", list.map((x) => x.id)); fresh = ns.fresh; mark = ns.mark;
-  render(); classicsUI();
+  render(); classicsUI(); patchFirst();
+}
+function patchFirst() {
+  const score = (c) => (c.ransomware ? 40 : 0) + (isEdge(c) ? 30 : 0) + (c.epss || 0) * 30 + Math.max(0, 30 - (Date.now() - Date.parse(c.date || 0)) / 864e5);
+  const top = list.filter((c) => c.kev && !c.snapshot).sort((a, b) => score(b) - score(a)).slice(0, 6);
+  const box = $("#pfList"); if (!top.length) { box.closest("section").hidden = true; return; }
+  put(box, top.map((c) => h("li", h("button.pf-i", { type: "button", onclick: () => detail(c) },
+    h("span.mono", c.id), h("b", [c.vendor, c.product].filter(Boolean).join(" ")),
+    h("span.muted.small", [c.ransomware ? "ransomware" : "", isEdge(c) ? "edge device" : "", c.epss != null ? `EPSS ${(c.epss * 100).toFixed(c.epss < 0.1 ? 1 : 0)}%` : "", c.date ? `added ${c.date}` : "", c.due ? `due ${c.due}` : ""].filter(Boolean).join(" · "))))));
 }
 export function show() { render(); }
 export function hide() { mark(); const b = $("#menuNew"); if (b) b.hidden = true; }
@@ -37,6 +46,7 @@ function match(c) {
   if (query && !`${c.id} ${c.vendor} ${c.product} ${c.title} ${c.desc}`.toLowerCase().includes(query)) return false;
   const stack = profile().stack.map((s) => s.toLowerCase());
   switch (filter) {
+    case "week": return c.date && Date.now() - Date.parse(c.date) < 7.5 * 864e5;
     case "kev": return c.kev; case "ran": return c.ransomware; case "crit": return c.sev === "critical"; case "edge": return isEdge(c);
     case "mine": return stack.some((s) => `${c.vendor} ${c.product}`.toLowerCase().includes(s.split(" ")[0]));
     case "watch": return watchlist().includes(c.id);

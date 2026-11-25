@@ -27,7 +27,7 @@ const CLEAN = {
     const kev = arr(d.kev).filter((k) => CVE.test(k?.id)).map((k) => ({
       id: k.id, vendor: t(k.vendor, 60), product: t(k.product, 80), title: t(k.title, 140), desc: t(k.desc, 420),
       action: t(k.action, 260), added: t(k.added, 10), due: t(k.due, 10), ransomware: k.ransomware === true,
-      cwe: arr(k.cwe).map((c) => t(c, 16)).slice(0, 3),
+      cwe: arr(k.cwe).map((c) => t(c, 16)).slice(0, 3), refs: arr(k.refs).map(url).filter(Boolean).slice(0, 3),
     }));
     const nvd = arr(d.nvd).filter((k) => CVE.test(k?.id)).map((k) => ({
       id: k.id, published: t(k.published, 10), desc: t(k.desc, 420), cvss: k.cvss === null ? null : num(k.cvss, null, 0, 10),
@@ -45,7 +45,9 @@ const CLEAN = {
   },
   news(d) {
     const item = (i) => ({ t: t(i?.t, 200), u: url(i?.u), s: t(i?.s, 60), d: isoOk(i?.d) || "", x: t(i?.x, 260), g: arr(i?.g).map((g) => t(g, 20)).slice(0, 3) });
-    return { generated: isoOk(d.generated), status: cleanStatus(d.status), security: arr(d.security).map(item).filter((i) => i.t && i.u), ai: arr(d.ai).map(item).filter((i) => i.t && i.u) };
+    const mcp = arr(d.mcp).map((m) => ({ t: t(m?.t, 120), x: t(m?.x, 220), v: t(m?.v, 30), u: url(m?.u), d: isoOk(m?.d) || "", remote: m?.remote === true, pkg: t(m?.pkg, 40) })).filter((m) => m.t);
+    return { generated: isoOk(d.generated), status: cleanStatus(d.status), security: arr(d.security).map(item).filter((i) => i.t && i.u), ai: arr(d.ai).map(item).filter((i) => i.t && i.u),
+      soc: arr(d.soc).map(item).filter((i) => i.t && i.u), mcp };
   },
   malware(d) {
     const fams = {};
@@ -59,6 +61,11 @@ const CLEAN = {
       trending: arr(d.trending).filter((x) => /^[a-z]{2,6}\.[a-z0-9_]{2,60}$/.test(x?.id)).map((x) => ({ id: x.id, name: t(x.name, 50), iocs: num(x.iocs, 0) })).slice(0, 20),
       samples: Object.fromEntries(Object.entries(obj(d.samples)).slice(0, 15).map(([k, v]) => [t(k, 50), num(v, 0)])),
       research: arr(d.research).map((i) => ({ t: t(i?.t, 200), u: url(i?.u), s: t(i?.s, 60), d: isoOk(i?.d) || "" })).filter((i) => i.u).slice(0, 30) };
+  },
+  ransomware(d) {
+    const pairs = (v, n) => arr(v).filter((p) => Array.isArray(p) && p.length === 2).slice(0, n).map((p) => [t(p[0], 60), num(p[1], 0, 0)]);
+    return { generated: isoOk(d.generated), status: cleanStatus(d.status), total7: num(d.total7, 0), total30: num(d.total30, 0),
+      groups7: pairs(d.groups7, 15), groups30: pairs(d.groups30, 20), sectors30: pairs(d.sectors30, 10), countries30: pairs(d.countries30, 12), daily: pairs(d.daily, 31) };
   },
   detections(d) {
     const LV = ["informational", "low", "medium", "high", "critical"];
@@ -85,6 +92,18 @@ export function load(name) {
   return pending[name];
 }
 export const loaded = (name) => cache[name];
+
+/** Re-fetch everything already loaded. Returns the names whose "generated" time moved on. */
+export async function refresh() {
+  const names = Object.keys(cache); const changed = [];
+  await Promise.all(names.map(async (name) => {
+    try {
+      const d = CLEAN[name](await fetchJson(name));
+      if (d && d.generated && d.generated !== cache[name]?.generated) { cache[name] = d; changed.push(name); emit("data:" + name, d); }
+    } catch (e) { console.info("[data refresh]", String(e.message || e)); }
+  }));
+  return changed;
+}
 
 // ---------- CVE helpers ----------
 /** One merged list of recent CVEs with a "heat" score. */

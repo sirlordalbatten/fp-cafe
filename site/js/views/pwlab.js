@@ -58,24 +58,43 @@ function check() {
     h("div.pw-times", [[g / 10, "Guessing at a login page, 10 a second"], [g / 1e4, "Stolen hash, slow algorithm like bcrypt"], [g / 1e10, "Stolen hash, fast algorithm, one GPU rig"]].map(([s, l]) => h("div", h("b", fmtTime(s)), h("span", l)))),
     a.found.length ? h("ul.tight", a.found.map((f) => h("li", f))) : null);
 }
+// Structure of a password in plain words: "6 letters, 4 digits, 1 symbol".
+function shape(pw) {
+  const runs = []; for (const ch of pw) { const k = /[a-z]/.test(ch) ? "lowercase letter" : /[A-Z]/.test(ch) ? "capital letter" : /\d/.test(ch) ? "digit" : "symbol";
+    if (runs.length && runs[runs.length - 1][0] === k) runs[runs.length - 1][1]++; else runs.push([k, 1]); }
+  return runs.map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(", then ");
+}
+const mask = (pw, show) => [...pw].map((ch, i) => (show.has(i) ? ch : /[a-zA-Z]/.test(ch) ? "_" : /\d/.test(ch) ? "#" : "?"));
 function crack() {
   const c = CRACK[((dayNum() * 5) % CRACK.length + CRACK.length) % CRACK.length]; const person = CAST[c.who] || CAST.kevin;
   const key = "crack_" + todayKey(); const solved = store.get(key, false) === true; let tries = Number(store.get(key + "_n", 0)) || 0;
   const av = h("span.av"); av.innerHTML = avatar(person.a, 56);
   const inp = h("input.search", { type: "text", placeholder: "Your guess", autocomplete: "off", spellcheck: "false", "aria-label": "Password guess" });
-  const out = h("p", { "aria-live": "polite" }); const clues = h("ol.clues");
-  const showClues = () => put(clues, c.c.slice(0, Math.min(c.c.length, 1 + tries)).map((x) => h("li", x)));
+  const out = h("p", { "aria-live": "polite" }); const clues = h("ol.clues"); const maskEl = h("div.pwmask", { "aria-label": "Password shape" });
+  const known = () => { const s = new Set(); if (tries >= 2 || solved) s.add(0); if (tries >= 4 || solved) s.add(c.pw.length - 1); if (solved) [...c.pw].forEach((_, i) => s.add(i)); return s; };
+  const showClues = () => {
+    put(clues, c.c.slice(0, Math.min(c.c.length, 1 + tries)).map((x) => h("li", x)));
+    put(maskEl, mask(c.pw, known()).map((ch) => h("span.pm" + (ch === "_" || ch === "#" || ch === "?" ? "" : ".on"), ch)));
+  };
   const go = () => {
     const g = inp.value.trim(); if (!g) return; tries++; store.set(key + "_n", tries);
     if (g === c.pw) { out.textContent = `Cracked! ${c.l}`; if (!store.get(key, false)) { store.set(key, true); bump("crack"); earn(6, "crack"); xp(12, "crack"); } sting("win"); }
-    else if (g.toLowerCase() === c.pw.toLowerCase()) { out.textContent = "So close: check your capitals."; sfx("thud"); }
-    else { out.textContent = tries >= c.c.length ? `Not it. Last clue's up. Think like ${person.n}.` : "Not it. Another clue unlocked."; sfx("thud"); }
+    else if (g.toLowerCase() === c.pw.toLowerCase()) { out.textContent = "So close: the letters are right, check the capitals."; sfx("thud"); }
+    else {
+      const same = [...g].filter((ch, i) => c.pw[i] === ch).length;
+      const len = g.length === c.pw.length ? "Right length." : g.length < c.pw.length ? `Too short by ${c.pw.length - g.length}.` : `Too long by ${g.length - c.pw.length}.`;
+      const un = []; if (tries < c.c.length) un.push("new clue below"); if (tries === 2) un.push("first character revealed"); if (tries === 4) un.push("last character revealed");
+      const unlock = un.length ? " Unlocked: " + un.join(", ") + "." : "";
+      out.textContent = `Not it. ${len} ${same} of ${c.pw.length} characters are in the right place.${unlock}`; sfx("thud");
+    }
     showClues();
   };
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
   showClues();
   put($("#crack"), h("div.crack-who", av, h("div", h("b", person.n), h("span.muted", " · " + person.t), h("p.muted.small", person.q))),
-    h("p.small", "You're the red team. Everything you need is in what they overshare."), clues,
+    h("p.small", "You're the red team. Everything you need is in what they overshare. Every wrong guess tells you how close you are."),
+    h("p.small", h("b", `${c.pw.length} characters: `), shape(c.pw) + "."), maskEl,
+    h("p.muted.small", "_ is a letter, # is a digit, ? is a symbol."), clues,
     h("div.row", inp, h("button.btn.sm", { onclick: go }, "Guess")), out,
     solved ? h("p.muted.small", `Solved today. Lesson: ${c.l}`) : null);
 }

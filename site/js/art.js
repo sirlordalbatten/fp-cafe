@@ -8,33 +8,55 @@ export function hatArt(id){ switch(id){
   case "grad": return `<path d="M24 22h32v6H24z" fill="#1C1F27"/><path d="M40 6l26 9-26 9-26-9z" fill="#262A35"/><path d="M60 15v12" stroke="#F5B841" stroke-width="2"/><circle cx="60" cy="28" r="2.5" fill="#F5B841"/>`;
   case "crown": return `<path d="M24 26V10l8 8 8-12 8 12 8-8v16z" fill="#F5B841" stroke="#C98F1E" stroke-width="1.5" stroke-linejoin="round"/><circle cx="40" cy="19" r="2.5" fill="#E8505B"/>`;
   default: return ""; } }
-function buddyEyes(kind,mood){
-  const L=kind==="owl"?28:30, R=kind==="owl"?52:50, y=kind==="owl"?42:44, ink=kind==="panda"?"#F1ECE2":"#1B1F2B";
-  if(mood==="sleepy") return {w:`<path d="M${L-5} ${y}q5 3 10 0M${R-5} ${y}q5 3 10 0" stroke="${ink}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`,p:""};
-  if(mood==="happy") return {w:`<path d="M${L-5} ${y+1}q5-6 10 0M${R-5} ${y+1}q5-6 10 0" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,p:""};
-  let w="",p="";
-  if(kind==="owl"){ w=`<circle cx="${L}" cy="${y}" r="8" fill="#FFF6E5"/><circle cx="${R}" cy="${y}" r="8" fill="#FFF6E5"/>`; p=`<circle cx="${L}" cy="${y}" r="4" fill="#1B1F2B"/><circle cx="${R}" cy="${y}" r="4" fill="#1B1F2B"/><circle cx="${L+1.5}" cy="${y-1.5}" r="1.3" fill="#fff"/><circle cx="${R+1.5}" cy="${y-1.5}" r="1.3" fill="#fff"/>`; }
-  else if(kind==="cat"){ w=`<ellipse cx="${L}" cy="${y}" rx="4.8" ry="5.8" fill="#F5B841"/><ellipse cx="${R}" cy="${y}" rx="4.8" ry="5.8" fill="#F5B841"/>`; p=`<ellipse cx="${L}" cy="${y}" rx="1.5" ry="4.4" fill="#1B1F2B"/><ellipse cx="${R}" cy="${y}" rx="1.5" ry="4.4" fill="#1B1F2B"/>`; }
-  else { w=`<circle cx="${L}" cy="${y}" r="4.6" fill="${kind==="panda"?"#1F2229":"#FFF6E5"}"/><circle cx="${R}" cy="${y}" r="4.6" fill="${kind==="panda"?"#1F2229":"#FFF6E5"}"/>`; p=`<circle cx="${L}" cy="${y}" r="3" fill="${ink}"/><circle cx="${R}" cy="${y}" r="3" fill="${ink}"/><circle cx="${L+1}" cy="${y-1.2}" r="1" fill="${kind==="panda"?"#1F2229":"#fff"}"/><circle cx="${R+1}" cy="${y-1.2}" r="1" fill="${kind==="panda"?"#1F2229":"#fff"}"/>`; }
-  if(mood==="sad") w=`<path d="M${L-7} ${y-9}l8 3M${R+7} ${y-9}l-8 3" stroke="#1B1F2B" stroke-width="2" stroke-linecap="round"/>`+w;
-  return {w,p}; }
-export function mascot(kind,hat,mood,react){
-  const c=({cat:"#8C95B2",owl:"#8B6A4E",fox:"#E07A3A",panda:"#F1ECE2"})[kind]||"#8C95B2"; let ears="", face="", cheeks="";
-  if(kind==="cat"){ ears=`<path d="M18 34L21 12 36 24Z" fill="${c}"/><path d="M62 34L59 12 44 24Z" fill="${c}"/><path d="M22 28l1.5-9 7 6z" fill="#E8A0A8"/><path d="M58 28l-1.5-9-7 6z" fill="#E8A0A8"/>`;
-    face=`<path d="M38 51h4l-2 2.5z" fill="#E8A0A8"/><path d="M14 50l10 1M14 55l10-1M66 50l-10 1M66 55l-10-1" stroke="#ffffff99" stroke-width="1"/>`; }
-  if(kind==="owl"){ ears=`<path d="M20 26l2-12 10 8z" fill="#6E5139"/><path d="M60 26l-2-12-10 8z" fill="#6E5139"/>`;
-    face=`<circle cx="28" cy="42" r="11" fill="#C9A77F"/><circle cx="52" cy="42" r="11" fill="#C9A77F"/><path d="M37 50l3 6 3-6z" fill="#F5B841"/><path d="M26 63q4 3 8 0q3 3 6 0q3 3 6 0q4 3 8 0" stroke="#6E5139" stroke-width="1.6" fill="none"/>`; }
-  if(kind==="fox"){ ears=`<path d="M16 34L19 8 36 24Z" fill="${c}"/><path d="M64 34L61 8 44 24Z" fill="${c}"/><path d="M19 8l2 10 5-4z" fill="#2A1A12"/><path d="M61 8l-2 10-5-4z" fill="#2A1A12"/>`;
-    face=`<path d="M17 50Q40 76 63 50Q52 58 40 58Q28 58 17 50Z" fill="#F4EDE0"/><ellipse cx="40" cy="55" rx="3.2" ry="2.4" fill="#1B1F2B"/>`; }
-  if(kind==="panda"){ ears=`<circle cx="21" cy="24" r="8" fill="#1F2229"/><circle cx="59" cy="24" r="8" fill="#1F2229"/>`;
-    face=`<ellipse cx="30" cy="45" rx="7.5" ry="9.5" transform="rotate(-25 30 45)" fill="#1F2229"/><ellipse cx="50" cy="45" rx="7.5" ry="9.5" transform="rotate(25 50 45)" fill="#1F2229"/><ellipse cx="40" cy="55" rx="3.5" ry="2.4" fill="#1F2229"/>`; }
-  if(mood==="happy"||react) cheeks=`<ellipse cx="23" cy="53" rx="4" ry="2.4" fill="#FF8A9A" opacity=".55"/><ellipse cx="57" cy="53" rx="4" ry="2.4" fill="#FF8A9A" opacity=".55"/>`;
-  const e=buddyEyes(kind,react?"happy":mood);
-  const mouth=react?`<ellipse cx="40" cy="61" rx="3" ry="3.6" fill="#3A1F24"/>`:mood==="sad"?`<path d="M35 63q5-4 10 0" stroke="#1B1F2B" stroke-width="1.6" fill="none" stroke-linecap="round"/>`:
-    kind==="owl"?"":`<path d="M36 57q2 2.5 4 0q2 2.5 4 0" stroke="${kind==="panda"?"#1F2229":"#1B1F2B"}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
-  const zz=mood==="sleepy"&&!react?`<g class="m-z"><text x="62" y="20">z</text><text x="68" y="10">z</text></g>`:"";
-  return `<svg viewBox="0 0 80 80" class="buddy-svg" aria-hidden="true"><ellipse class="m-shadow" cx="40" cy="76" rx="20" ry="3" fill="#0007"/>
-    <g class="m-bob"><g class="m-ears">${ears}</g><circle cx="40" cy="46" r="26" fill="${c}"/>${face}${cheeks}<g class="m-eyes">${e.w}<g class="m-pupils">${e.p}</g></g>${mouth}${hat?`<g class="m-hat">${hatArt(hat)}</g>`:""}</g>${zz}</svg>`; }
+// Chibi buddies: big glossy eyes, rosy cheeks, soft shading, holding a coffee mug.
+const PAL = {
+  cat:   { fur: "#B7C2E8", shade: "#8E9AC6", belly: "#EEF1FB", inner: "#F6B8C8", ink: "#2B2340" },
+  fox:   { fur: "#F39A52", shade: "#D9733A", belly: "#FFF4E6", inner: "#FFE1C7", ink: "#2B2340" },
+  owl:   { fur: "#C29A73", shade: "#9A7552", belly: "#F6E8D4", inner: "#F6E8D4", ink: "#2B2340" },
+  panda: { fur: "#FBFAF7", shade: "#DCD8CF", belly: "#FFFFFF", inner: "#2E2A35", ink: "#2B2340" },
+};
+function eyes(kind, mood, P) {
+  const L = 31, R = 49, y = 42;
+  const arc = (dy) => `<path d="M${L - 5} ${y + dy}q5 ${dy < 0 ? 6 : -6} 10 0M${R - 5} ${y + dy}q5 ${dy < 0 ? 6 : -6} 10 0" stroke="${P.ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+  if (mood === "happy") return { w: arc(2), p: "" };
+  if (mood === "sleepy") return { w: `<path d="M${L - 5} ${y + 1}h10M${R - 5} ${y + 1}h10" stroke="${P.ink}" stroke-width="2.6" stroke-linecap="round"/>`, p: "" };
+  const big = kind === "owl" ? 6.6 : 5.6;
+  const ball = (x) => `<ellipse cx="${x}" cy="${y}" rx="${big}" ry="${big + 1}" fill="${P.ink}"/><circle cx="${x + 2}" cy="${y - 2.6}" r="${big * 0.38}" fill="#fff"/><circle cx="${x - 1.8}" cy="${y + 2.4}" r="${big * 0.17}" fill="#fff" opacity=".85"/>`;
+  let w = "";
+  if (kind === "owl") w = `<circle cx="${L}" cy="${y}" r="9.5" fill="${P.belly}"/><circle cx="${R}" cy="${y}" r="9.5" fill="${P.belly}"/>`;
+  if (mood === "sad") w += `<path d="M${L - 6} ${y - 9}q5-3 9 0M${R + 6} ${y - 9}q-5-3-9 0" stroke="${P.ink}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
+  return { w, p: ball(L) + ball(R) };
+}
+export function mascot(kind, hat, mood, react) {
+  const P = PAL[kind] || PAL.cat; const id = "g" + kind;
+  let ears = "", face = "";
+  if (kind === "cat") ears = `<path d="M17 30Q16 10 28 16Q24 24 17 30Z" fill="${P.fur}"/><path d="M63 30Q64 10 52 16Q56 24 63 30Z" fill="${P.fur}"/><path d="M20 25Q20 15 26 18Z" fill="${P.inner}"/><path d="M60 25Q60 15 54 18Z" fill="${P.inner}"/>`;
+  if (kind === "fox") { ears = `<path d="M15 32Q12 6 31 15Q24 22 15 32Z" fill="${P.fur}"/><path d="M65 32Q68 6 49 15Q56 22 65 32Z" fill="${P.fur}"/><path d="M19 26Q18 13 27 17Z" fill="${P.inner}"/><path d="M61 26Q62 13 53 17Z" fill="${P.inner}"/>`;
+    face = `<path d="M18 44Q24 60 40 60Q56 60 62 44Q54 52 40 52Q26 52 18 44Z" fill="${P.belly}"/>`; }
+  if (kind === "owl") { ears = `<path d="M19 22Q18 12 28 17Z" fill="${P.shade}"/><path d="M61 22Q62 12 52 17Z" fill="${P.shade}"/>`; }
+  if (kind === "panda") { ears = `<circle cx="21" cy="21" r="8" fill="#2E2A35"/><circle cx="59" cy="21" r="8" fill="#2E2A35"/>`;
+    face = `<ellipse cx="31" cy="42" rx="8.5" ry="9.5" transform="rotate(-18 31 42)" fill="#2E2A35"/><ellipse cx="49" cy="42" rx="8.5" ry="9.5" transform="rotate(18 49 42)" fill="#2E2A35"/>`; }
+  const md = react ? "happy" : mood;
+  const Pe = { ...P, ink: kind === "panda" ? (md === "happy" || md === "sleepy" ? "#F5F2EC" : "#141218") : P.ink };
+  const e = eyes(kind, md, Pe);
+  if (kind === "panda" && e.p) e.p = e.p.replace(/<ellipse cx="(\d+)" cy="42" rx="[\d.]+" ry="[\d.]+" fill="#141218"\/>/g, (m, x) => `<circle cx="${x}" cy="42" r="7.2" fill="#F5F2EC"/>` + m);
+  const nose = kind === "owl" ? `<path d="M37.5 48l2.5 4 2.5-4z" fill="#F5B841"/>` : `<ellipse cx="40" cy="49" rx="2.2" ry="1.6" fill="${kind === "panda" ? "#2E2A35" : "#5A3A4A"}"/>`;
+  const mouth = react ? `<path d="M36 52.5q4 5 8 0z" fill="#7A2E3E"/>`
+    : mood === "sad" ? `<path d="M37 54q3-2.5 6 0" stroke="${P.ink}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`
+    : `<path d="M36.5 51.5q1.75 2 3.5 0q1.75 2 3.5 0" stroke="${kind === "panda" ? "#2E2A35" : "#5A3A4A"}" stroke-width="1.5" fill="none" stroke-linecap="round"/>`;
+  const cheeks = `<ellipse cx="23.5" cy="50" rx="4.2" ry="2.6" fill="#FF8FA8" opacity="${mood === "happy" || react ? ".75" : ".5"}"/><ellipse cx="56.5" cy="50" rx="4.2" ry="2.6" fill="#FF8FA8" opacity="${mood === "happy" || react ? ".75" : ".5"}"/>`;
+  const tear = mood === "sad" && !react ? `<path d="M25 47q-1.5 3 0 4q1.5-1 0-4z" fill="#9FD3FF"/>` : "";
+  const body = `<ellipse cx="40" cy="67" rx="17" ry="11" fill="url(#${id}b)"/><ellipse cx="40" cy="69" rx="10" ry="7" fill="${P.belly}"/>`;
+  const mug = `<g class="m-mug"><rect x="33" y="63" width="12" height="10" rx="2.5" fill="#FFFDF8"/><path d="M45 65.5q4 0 4 3t-4 3" stroke="#FFFDF8" stroke-width="1.8" fill="none"/><rect x="34.5" y="64.5" width="9" height="2.2" rx="1" fill="#8A5A3B"/>
+    <circle cx="31.5" cy="68" r="3" fill="${P.fur}"/><circle cx="47.5" cy="70" r="3" fill="${P.fur}"/>
+    <path class="m-steam" d="M37 60q-1.5-2 0-4M41 59q-1.5-2 0-4" stroke="#ffffff88" stroke-width="1.2" fill="none" stroke-linecap="round"/></g>`;
+  const zz = mood === "sleepy" && !react ? `<g class="m-z" fill="#C9D4FF" font-size="10" font-weight="700"><text x="62" y="20">z</text><text x="68" y="10">z</text></g>` : "";
+  return `<svg viewBox="0 0 80 80" class="buddy-svg" aria-hidden="true"><defs>
+    <radialGradient id="${id}h" cx=".38" cy=".32" r=".75"><stop offset=".45" stop-color="${P.fur}"/><stop offset="1" stop-color="${P.shade}"/></radialGradient>
+    <radialGradient id="${id}b" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="${P.fur}"/><stop offset="1" stop-color="${P.shade}"/></radialGradient></defs>
+    <ellipse class="m-shadow" cx="40" cy="78" rx="18" ry="2.6" fill="#0006"/>
+    <g class="m-bob">${body}<g class="m-ears">${ears}</g><circle cx="40" cy="40" r="25" fill="url(#${id}h)"/><ellipse cx="31" cy="26" rx="9" ry="5" transform="rotate(-25 31 26)" fill="#fff" opacity=".28"/>${face}${cheeks}<g class="m-eyes">${e.w}<g class="m-pupils">${e.p}</g></g>${tear}${nose}${mouth}${mug}${hat ? `<g class="m-hat">${hatArt(hat)}</g>` : ""}</g>${zz}</svg>`;
+}
 export function avatar(a,size){ const s=size||48;
   const hair={short:`<path d="M13 21c0-8 5-12 11-12s11 4 11 12c-2-4-6-6-11-6s-9 2-11 6z" fill="${a.hair}"/>`,
     long:`<path d="M12 23c0-9 5-14 12-14s12 5 12 14v10h-4V22c-2-4-5-6-8-6s-6 2-8 6v11h-4z" fill="${a.hair}"/>`,

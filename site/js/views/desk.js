@@ -6,6 +6,7 @@ import { bump, earn, xp, today } from "../state.js";
 import { loaded, load, cveList } from "../data.js";
 import { CAST, ROUTES, WRONG, CISO_LINES, CISO_STATES, CH_LABEL, CH_SOUND, TOOLS, PEBKAC } from "../content/legacy.js";
 import { T, LIVE, VARS } from "../content/tickets.js";
+import { genTicket, SCENE_COUNT } from "../content/deskgen.js";
 
 const MAX_Q = 6;
 let q = [], ciso = 70, arrive = 0, feedback = [];
@@ -20,21 +21,30 @@ function makeTicket() {
     if (live < 2 && c.length) { const x = pick(c); tpl = LIVE[live]; extra = { vendor: x.vendor || "a vendor", product: x.product || "that product", id: x.id }; }
     else if (live === 2 && n.length) { tpl = LIVE[2]; extra = { headline: pick(n).t.slice(0, 110) }; }
   }
+  const id = Math.random().toString(36).slice(2, 10);
+  if (!tpl && rnd() < 0.65) {
+    const g = genTicket(rnd, fresh("deskScene", [...Array(SCENE_COUNT).keys()], (x) => x, 0.6));
+    return { id, f: g.p ? "gen" : g.f, p: g.p || undefined, ch: g.ch, m: g.m, a: g.a, w: g.w, at: Date.now() };
+  }
   if (!tpl) tpl = T[fresh("deskT", T.map((_, i) => i), (x) => x, 0.75)];
   const from = pick(tpl.f);
-  return { id: Math.random().toString(36).slice(2, 10), f: from, ch: pick(tpl.ch), m: fill(tpl.m, extra), a: tpl.a, w: tpl.w, at: Date.now() };
+  return { id, f: from, ch: pick(tpl.ch), m: fill(tpl.m, extra), a: tpl.a, w: tpl.w, at: Date.now() };
 }
 function load_() {
-  q = arr(store.get("deskQ", [])).filter((t) => t && CAST[t.f] && ROUTES.some((r) => r[0] === t.a)).map((t) => ({
-    id: str(t.id, 12), f: t.f, ch: CH_LABEL[t.ch] ? t.ch : "chat", m: str(t.m, 400), a: t.a, w: str(t.w, 300), at: num(t.at, Date.now()) })).slice(0, MAX_Q);
+  const HEX = /^#[0-9A-Fa-f]{6}$/;
+  const okP = (p) => p && typeof p === "object" && p.a && ["bg", "skin", "hair", "shirt"].every((k) => HEX.test(p.a[k])) && ["short", "long", "bun", "bald", "cap"].includes(p.a.style);
+  q = arr(store.get("deskQ", [])).filter((t) => t && (CAST[t.f] || (t.f === "gen" && okP(t.p))) && ROUTES.some((r) => r[0] === t.a)).map((t) => ({
+    id: str(t.id, 12), f: t.f, p: t.f === "gen" ? { n: str(t.p.n, 24), t: str(t.p.t, 30), a: { bg: t.p.a.bg, skin: t.p.a.skin, hair: t.p.a.hair, shirt: t.p.a.shirt, style: t.p.a.style, acc: ["none", "glasses", "headset", "tie", "hoodie"].includes(t.p.a.acc) ? t.p.a.acc : "none" } } : undefined,
+    ch: CH_LABEL[t.ch] ? t.ch : "chat", m: str(t.m, 400), a: t.a, w: str(t.w, 300), at: num(t.at, Date.now()) })).slice(0, MAX_Q);
   ciso = num(store.get("ciso", 70), 70, 0, 100);
 }
+const who = (t) => t.p || CAST[t.f];
 const save = () => { store.set("deskQ", q); store.set("ciso", ciso); };
 
 export function addTicket(quiet = false) {
   if (q.length >= MAX_Q) { ciso = Math.max(0, ciso - 4); save(); return; }
   const t = makeTicket(); q.push(t); save();
-  if (!quiet) { sfx2(CH_SOUND[t.ch] || "ping"); toast(`${CAST[t.f].n} (${CH_LABEL[t.ch]}): "${t.m.slice(0, 60)}${t.m.length > 60 ? "…" : ""}"`); }
+  if (!quiet) { sfx2(CH_SOUND[t.ch] || "ping"); toast(`${who(t).n} (${CH_LABEL[t.ch]}): "${t.m.slice(0, 60)}${t.m.length > 60 ? "…" : ""}"`); }
   badge(); if ($("#deskQueue")) renderQueue();
 }
 function badge() { const b = $("#deskCount"); if (b) { b.hidden = !q.length; b.textContent = q.length; } }
@@ -96,9 +106,9 @@ function renderQueue() {
     f.ok ? h("p", h("b", f.right), ". ", f.why) : [h("p", "You picked ", h("b", f.picked), ". The right call was ", h("b", f.right), "."), h("p", f.wrong ? f.wrong + " " : "", f.why)]));
   if (!q.length) { put(box, fb, h("p.empty", "Inbox zero. Nobody believes you, but well done.")); return; }
   put(box, fb, q.map((t) => {
-    const p = CAST[t.f]; const av = h("span.av"); av.innerHTML = avatar(p.a, 44);
+    const p = who(t); const av = h("span.av"); av.innerHTML = avatar(p.a, 44);
     return h("article.ticket", { dataset: { id: t.id } },
-      h("div.tk-head", av, h("div", h("b", p.n), h("span.muted", ` · ${p.t} · ${CH_LABEL[t.ch]}`), h("p.muted.small", p.q))),
+      h("div.tk-head", av, h("div", h("b", p.n), h("span.muted", ` · ${p.t} · ${CH_LABEL[t.ch]}`), p.q ? h("p.muted.small", p.q) : null)),
       h("p.tk-msg", t.m),
       h("div.routes", ROUTES.map(([k, label]) => h("button.btn.sm.r-" + k, { onclick: () => route(t, k) }, label))));
   }));
@@ -108,7 +118,7 @@ function route(t, k) {
   q = q.filter((x) => x.id !== t.id);
   const ok = k === t.a; bump("tickets"); if (ok) bump("ticketsRight"); if (ok && (k === "it" || k === "net")) bump("bounced");
   const label = (x) => (ROUTES.find((r) => r[0] === x) || [x, x])[1];
-  feedback.unshift({ id: t.id, ok, who: CAST[t.f].n, msg: t.m, picked: label(k), right: label(t.a), why: t.w, wrong: ok ? "" : WRONG[k] || "" });
+  feedback.unshift({ id: t.id, ok, who: who(t).n, msg: t.m, picked: label(k), right: label(t.a), why: t.w, wrong: ok ? "" : WRONG[k] || "" });
   feedback = feedback.slice(0, 3);
   const entry = feedback[0];
   setTimeout(() => {   // verdicts clear themselves after 3 seconds

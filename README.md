@@ -7,20 +7,22 @@
 ## What's inside
 | Section | What it does | Freshness |
 |---|---|---|
-| **Lounge** | Split-flap arrivals board of newly exploited CVEs, a live threat radar, a ten-second brief, buddy, daily quests, mood check-in, pager ticker | every 3 h |
-| **The desk** | Tickets walk in while the tab is open. Route them, bounce them to IT or Network, keep the CISO calm, swear at your tools | generated from ~45 templates plus live CVEs and news |
+| **Lounge** | A dashboard: split-flap arrivals board, KPI tiles (exploited this week, new criticals, ransomware posts, top vendor), quick indicator lookup with TI pivot links, a sector radar (where CVEs hit × how recent) with a "look at these first" list, ten-second brief, buddy, quests, pager. Open tabs re-fetch data every 15 minutes | every 3 h |
+| **The desk** | Tickets walk in while the tab is open. Route them, bounce them to IT or Network, keep the CISO calm, swear at your tools | combinatorial scenes with generated colleagues, where one detail decides the route, plus templates and live CVEs and news |
 | **Morning brew** | A two-minute digest: three things to know, numbers for your manager, the latest headlines | every 3 h |
-| **CVE menu** | Every CISA KEV entry from the last 120 days plus new critical CVEs from NVD, scored with EPSS, filterable by your stack | every 3 h |
-| **Malware bar** | 32 curated family profiles (how it gets in, what you'll see, how to hunt it) with live activity from Malpedia, abuse.ch and news mentions | every 3 h |
-| **AI lab** | AI and MCP news, an interactive walkthrough of an AI agent triaging an alert through MCP tools (with a prompt-injection toggle), MCP explainer, AI-security glossary | every 3 h |
+| **CVE menu** | Every CISA KEV entry from the last 120 days plus new critical CVEs from NVD, scored with EPSS, filterable by your stack. A "Patch first" list and vendor advisory links | every 3 h |
+| **Malware bar** | 32 curated family profiles (how it gets in, what you'll see, how to hunt it) with live activity from Malpedia, abuse.ch and news mentions, plus ransomware leak-site activity (groups, sectors, countries, daily posts; counts only, never victim names) from ransomware.live | every 3 h |
+| **AI lab** | Built from live data: AI news, AI-product CVEs, the newest MCP registry servers with a capability and risk read-out, agent walkthroughs generated from today's KEV entry, an active malware family and a new MCP server (with a prompt-injection toggle), and a prompt-injection scanner | every 3 h |
 | **Detection lab** | The newest rules from SigmaHQ, Splunk Security Content, Microsoft Sentinel and Google SecOps, plus curated playbooks with triage and tuning notes | every 3 h |
+| **SOC playbook** | Practices from well-run SOCs (Palantir ADS, MITRE 11 Strategies, NCSC, Google SRE and ASO, PEAK, CISA, NIST 800-61r3, GitLab), each with its source and a first-week version, a self-check, and a live feed from SOC and detection team blogs | every 3 h |
+| **Phish sim** | Awareness campaign planner: briefs with red flags to teach (never send-ready kits), ethics rules, a year of themes, this week's real lures from the news, and a results calculator focused on report rate | |
 | **Arcade** | Five games (Swipe the phish, Alert rush, Contain the worm, Needle in the logs, Firewall frenzy) with a daily challenge | |
 | **Leaderboards** | Global, team and daily boards, updated live, with server-side anti-cheat | live |
-| **SOCdle** | A daily five-letter security word, with a decode puzzle as a bonus round | daily |
+| **SOCdle** | A daily five-letter security word with the category shown up front, up to two letter reveals and a word list that greys out what you've ruled out, plus a decode puzzle | daily |
 | **SOC tycoon** | Build a SOC: hire, automate, take client contracts, survive incidents, avoid burnout | |
-| **Password lab** | A strength checker that explains why, a passphrase generator, and a daily "crack a colleague" | daily |
-| **Shift buddy** | Custom shift hours (including overnight), break plan, essential nudges, a checklist with suggestions, a handover builder, and an analyst toolbox (time converter, defang, decode, hash ID) | |
-| **Snack lessons** | Hands-on micro-labs: spot the bad line, order the attack, match the event IDs. Includes a daily lab built from the newest KEV entry | daily |
+| **Password lab** | A strength checker that explains why, a passphrase generator, and a daily "crack a colleague" with a shape hint, a character mask and how-close feedback | daily |
+| **Shift buddy** | Custom shift hours (including overnight), break plan, essential nudges, a checklist with suggestions, a handover builder, wellbeing nudges (posture, water, movement, meals, caffeine cut-off, teammate check-ins, night-shift sleep prep), and an analyst toolbox: link unwrapper (SafeLinks, Proofpoint v1–v3, Google, Barracuda), IOC extractor, TI pivots, email header analyser, URL parser, lookalike/punycode checker, time converter, defang, decode, JWT, CIDR, hash ID | |
+| **Snack lessons** | 27 hands-on micro-labs (BEC, OAuth consent, golden tickets, Linux auth logs, web logs, CloudTrail, KQL, ransomware first hour, EDR tampering, ticket writing, DMARC and more), filterable by topic, plus a daily lab from the newest KEV entry | daily |
 | **Pop incidents** | Short timed scenarios generated from templates and live data, so they rarely repeat | |
 
 Sound is synthesised in the browser with the Web Audio API (no audio files), and only starts after you click something.
@@ -32,7 +34,8 @@ Sound is synthesised in the browser with the Web Audio API (no audio files), and
  │ pipeline/refresh.py      │ ──────────────▶ │ site/        static front end │
  │  CISA KEV · NVD · EPSS   │                 │ site/data/   validated JSON   │
  │  Malpedia · abuse.ch     │                 │ functions/   /api/* (Workers) │──▶ D1 (SQLite)
- │  RSS/Atom news + AI      │                 └──────────────────────────────┘    leaderboard
+ │  RSS/Atom news + AI/SOC  │
+ │  ransomware.live · MCP   │                 └──────────────────────────────┘    leaderboard
  │  Sigma · Splunk · KQL ·  │                              ▲
  │  YARA-L rule repos       │                              │ same origin only
  └──────────────────────────┘                          browser

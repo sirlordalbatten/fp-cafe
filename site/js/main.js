@@ -2,7 +2,7 @@
 // Each section lives in js/views/<name>.js and is loaded the first time it's opened.
 import { $, $$, h, icon, store, on, emit, toast, pad, nextPatchTuesday, ago, RM, countUp, fmtNum, num } from "./core.js";
 import { Snd, sfx, setChannel, setVolume, setSfx } from "./audio.js";
-import { load, statusLine } from "./data.js";
+import { load, statusLine, refresh } from "./data.js";
 import { profile, beans, level, visit, tidy, inv } from "./state.js";
 import { initBuddy, setLiveLines } from "./buddy.js";
 import { startIncidents } from "./incidents.js";
@@ -11,7 +11,7 @@ import { startDesk } from "./views/desk.js";
 import { applyTheme } from "./views/shop.js";
 import { openOnboarding } from "./onboarding.js";
 
-const VIEWS = ["lounge", "desk", "brew", "menu", "malware", "ai", "detect", "arcade", "boards", "socdle", "tycoon", "pwlab", "breakroom", "shift", "learn", "shop", "me"];
+const VIEWS = ["lounge", "desk", "brew", "menu", "malware", "ai", "detect", "playbook", "phishsim", "arcade", "boards", "socdle", "tycoon", "pwlab", "breakroom", "shift", "learn", "shop", "me"];
 const mods = {};
 let current = null;
 
@@ -19,6 +19,7 @@ async function route() {
   let v = (location.hash || "#lounge").slice(1).split("?")[0];
   if (!VIEWS.includes(v)) v = "lounge";
   if (current && current !== v && mods[current]?.hide) mods[current].hide();
+  if (current && current !== v && leaveRebuild.delete(current)) { delete mods[current]; $("#v-" + current).textContent = ""; }
   $$(".view").forEach((x) => x.classList.toggle("on", x.id === "v-" + v));
   $$("#nav a[data-v]").forEach((a) => a.toggleAttribute("aria-current", a.dataset.v === v));
   $$("#nav a[data-v]").forEach((a) => a.classList.toggle("on", a.dataset.v === v));
@@ -32,6 +33,7 @@ async function route() {
       sec.textContent = "";
       await mods[v].mount(sec);
     }
+    if (stale.has(v) && mods[v].refresh) { stale.delete(v); mods[v].refresh(); }
     if (current === v && mods[v].show) mods[v].show(sec);
   } catch (e) {
     console.error(e);
@@ -79,6 +81,23 @@ async function liveData() {
     $("#weather").replaceChildren(h("b", "Forecast loading"));
   }
 }
+
+// Keep an all-day tab current: every 15 minutes re-fetch the data files. The view on screen redraws
+// itself (if it knows how); data-only views that are mounted but hidden are rebuilt next time they're opened.
+let lastRefresh = Date.now();
+const REBUILD = new Set(["brew", "menu", "malware", "ai", "detect", "playbook", "phishsim"]);
+async function liveRefresh() {
+  if (document.visibilityState !== "visible") return;
+  lastRefresh = Date.now();
+  const changed = await refresh(); if (!changed.length) return;
+  liveData();
+  for (const v of Object.keys(mods)) {
+    if (v === current) { if (mods[v].refresh) mods[v].refresh(); else if (REBUILD.has(v)) leaveRebuild.add(v); continue; }
+    if (mods[v].refresh) { stale.add(v); continue; }
+    if (REBUILD.has(v)) { mods[v].hide?.(); delete mods[v]; $("#v-" + v).textContent = ""; }
+  }
+}
+const stale = new Set(), leaveRebuild = new Set();
 
 // ---------- radio ----------
 function radio() {
@@ -139,6 +158,8 @@ function boot() {
   $("#navToggle").addEventListener("click", () => { const open = !document.body.classList.contains("nav-open"); document.body.classList.toggle("nav-open", open); $("#navToggle").setAttribute("aria-expanded", String(open)); });
   initBuddy();
   liveData(); setInterval(() => { if (document.visibilityState === "visible") liveData(); }, 10 * 60e3);
+  setInterval(liveRefresh, 15 * 60e3);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - lastRefresh > 15 * 60e3) liveRefresh(); });
   load("news").then((n) => { if (n && n.ai[0] && store.get("aiSeen", "") !== n.ai[0].u) $("#aiNew").hidden = false; });
   window.addEventListener("hashchange", route);
   route();

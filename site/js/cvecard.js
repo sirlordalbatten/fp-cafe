@@ -102,6 +102,7 @@ export function detail(c) {
       h("li", "Hunt for it: search your asset inventory and EDR for the product name, then check logs around the device."),
     ),
     h("p.hug", hug(c)),
+    c.refs?.length ? h("div", h("h3.sub3", "Vendor advisory"), h("ul.tight", c.refs.map((u) => { let host = u; try { host = new URL(u).hostname.replace(/^www\./, ""); } catch { /* keep */ } return h("li", ext(u, host), h("span.muted.small", " (opens the vendor's page)")); }))) : null,
     h("p.links", ext(`https://nvd.nist.gov/vuln/detail/${c.id}`, "NVD entry"), c.kev ? ext("https://www.cisa.gov/known-exploited-vulnerabilities-catalog", "CISA KEV catalog") : null,
       ext(`https://www.first.org/epss/`, "About EPSS")),
   ], { label: c.id });

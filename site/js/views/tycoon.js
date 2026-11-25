@@ -84,10 +84,10 @@ export async function mount(sec) {
       <div class="panel"><div class="ph"><h3>Hire and build</h3><span class="muted small">cost rises 15% per purchase</span></div><div id="tyGens"></div></div>
     </div>
     <div class="stack">
+      <div class="panel"><div class="ph"><h3>Floor log</h3></div><ul class="tylog" id="tyLog"></ul></div>
       <div class="panel"><div class="ph"><h3>Upgrades</h3></div><div id="tyUps" class="upgs"></div></div>
       <div class="panel"><div class="ph"><h3>Achievements</h3></div><div id="tyAch"></div></div>
       <div class="panel"><div class="ph"><h3>Post-incident review</h3></div><div id="tyPrestige"></div></div>
-      <div class="panel"><div class="ph"><h3>Floor log</h3></div><ul class="tylog" id="tyLog"></ul></div>
     </div>
   </div>`);
   $("#tyClick").addEventListener("click", (e) => {
