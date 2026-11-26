@@ -67,6 +67,8 @@ export function pivots(ind) {
       add("OTX", `https://otx.alienvault.com/indicator/domain/${e(v)}`, "Community threat pulses");
       add("URLhaus", `https://urlhaus.abuse.ch/browse.php?search=${e(v)}`, "Malware download URLs on this host");
       add("Talos", `https://talosintelligence.com/reputation_center/lookup?search=${e(v)}`, "Web and email reputation");
+      add("Wayback Machine", `https://web.archive.org/web/*/${e(v)}/*`, "What it served in the past. Old pages and scripts can leak secrets");
+      add("Code that mentions it", `https://github.com/search?q=%22${e(v)}%22&type=code`, "Public repos referencing the domain");
       break;
     case "url":
       add("urlscan search", `https://urlscan.io/search/#${e('page.url:"' + v + '"')}`, "Has anyone already scanned this exact URL?");

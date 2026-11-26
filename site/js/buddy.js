@@ -1,9 +1,9 @@
-// The buddy: a small animated mascot that reacts to what happens on the site.
+// Your shift partner: one of six analyst characters, with their own voice, who reacts to what happens on the site.
 import { $, on, typeText, pick, RM, html, bumpEl } from "./core.js";
 import { mascot } from "./art.js";
 import { profile, inv, todayMood, buddyInfo } from "./state.js";
 import { sfx } from "./audio.js";
-import { SAY_DAY, SAY_NIGHT, SAY_GENTLE, SAY_ROLE } from "./content/legacy.js";
+import { SAY_DAY, SAY_NIGHT, SAY_GENTLE, SAY_ROLE, CHAR_LINES } from "./content/legacy.js";
 
 let reactUntil = 0;
 let clicks = [];
@@ -31,7 +31,8 @@ export function say(text, el = $("#say")) { if (el) typeText(el, text); }
 export function chatter() {
   const p = profile(); const night = document.body.classList.contains("night");
   let pool = p.humor === "gentle" ? SAY_GENTLE : night ? SAY_NIGHT : SAY_DAY;
-  pool = pool.concat(SAY_ROLE[p.role] || [], live, live);
+  const mine = CHAR_LINES[p.buddy] || [];
+  pool = pool.concat(SAY_ROLE[p.role] || [], live, live, mine, mine, mine);
   if ((todayMood() ?? 0) >= 3) pool = SAY_GENTLE.concat(["Rough day? Take a real break. The queue will still be there, sadly."]);
   say(pick(pool));
 }

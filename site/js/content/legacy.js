@@ -117,7 +117,21 @@ export const DEFAULT_CK = ["Check SIEM/EDR health dashboards (ingestion OK?)","R
 export const ROLES = ["L1 analyst","IR / L2","Detection eng","Threat hunter","SOC manager"];
 export const SIEMS = ["Sentinel / Defender","Splunk","Google SecOps","Elastic","QRadar","Other"];
 export const VENDORS = ["Microsoft","Cisco","Fortinet","Palo Alto","Ivanti","Citrix","VMware","Linux","Open source"];
-export const BUDDIES = {cat:{e:"",n:"Patch",d:"sleepy firewall cat"},owl:{e:"",n:"Hoot",d:"night-shift owl"},fox:{e:"",n:"Proxy",d:"sneaky-smart fox"},panda:{e:"",n:"Bamboo",d:"chill panda"}};
+export const BUDDIES = {
+  sunny:{e:"",n:"Sunny",d:"bubbly L1 who treats every alert like a mystery novel"},
+  dex:{e:"",n:"Dex",d:"deadpan veteran, has seen forty thousand false positives"},
+  rin:{e:"",n:"Rin",d:"quiet threat hunter, three queries ahead of you"},
+  theo:{e:"",n:"Theo",d:"calm IR lead, breathes in incidents, breathes out timelines"},
+  juno:{e:"",n:"Juno",d:"ex red teamer gone blue, chaotic good"},
+  noor:{e:"",n:"Noor",d:"night-shift legend, kind, unshakeable"}};
+// Each colleague has their own voice. Mixed into the general chatter.
+export const CHAR_LINES = {
+  sunny:["Ooh, a new alert! Okay, okay, who did it? Let's find out.","Fun fact: every false positive is a tiny lesson in disguise. A very annoying disguise.","I made a playlist for triage. It's 90% synthwave.","Small win: you read the whole alert before deciding. Proud of you.","Water check! I'm on my second bottle. You?","Today's vibe: curious, caffeinated, kind.","If it's weird, write it down. Weird is where the good stuff hides."],
+  dex:["Another impossible travel alert. It's the VPN. It's always the VPN.","I'm not grumpy. This is just my face.","Patch it, log it, close it. Then coffee.","I've seen this alert before. I'll see it again. We are old friends.","Take your break. The SIEM will still be wrong when you get back.","Somebody opened an invoice zip. Of course they did.","Fine. That was actually a good catch."],
+  rin:["Hypothesis first. Then the query. Then the coffee.","If it beacons every 60 seconds, it's not a person.","Look at what happened after the alert, not just the alert.","Parent process, child process, network. In that order.","Quiet shifts are the best time to hunt.","Turn a good hunt into a detection, or it didn't happen twice.","I like this one. It's lying about its parent process."],
+  theo:["Breathe. Write the timeline. Then decide.","Nobody fixes an incident faster by panicking. Slow is smooth.","Blameless doesn't mean nobody learns. It means everybody does.","Who owns it, what's the impact, what's next. That's the whole meeting.","Containment first, curiosity second.","Good handover notes are a gift to future you.","You did fine today. Really."],
+  juno:["I used to break in. Now I catch people breaking in. Same snacks.","If I wanted in, I'd go for the forgotten staging server. Do we have one? We have one.","Default passwords are just invitations with extra steps.","Attackers love a Friday. So do I, for different reasons.","Old API? Still online? Bold.","Credentials in a build log? Chef's kiss. For them. Not for us.","Let's go break something. In the lab. Legally."],
+  noor:["It's quiet. Too quiet. Kidding, it's just 3 AM.","Night shift rule one: double-check anything you close.","Bright light, cold water, short walk. Then the queue.","Eat something real. Vending machine crisps don't count.","Sunrise soon. You made it.","If you're tired, say so. That's how teams stay safe.","Write it down for the morning crew. They'll thank you."]};
 export const MOODS = [["","Great"],["","Good"],["","Meh"],["","Drained"],["streak","On fire (bad kind)"]];
 export const MOOD_REPLY = ["Love that energy. Go hunt something. ","Steady is good. Steady is underrated.","Meh is valid. Small wins today: one ticket at a time.",
   "Drained is real. Take your breaks for real today, and the Break Room is one click away. ","Ouch. Breathe first (try Handshake breathing), and loop in your lead if the load is too much. You don't have to carry it alone."];

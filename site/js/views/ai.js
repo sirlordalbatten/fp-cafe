@@ -5,7 +5,7 @@ import { load, cveList } from "../data.js";
 import { detail, status, productName } from "../cvecard.js";
 import { bump, xp } from "../state.js";
 import { sfx } from "../audio.js";
-import { INJECTION, GLOSSARY, OWASP, QUESTIONS } from "../content/ai.js";
+import { INJECTION, GLOSSARY, OWASP, QUESTIONS, AGENTIC } from "../content/ai.js";
 import { isAiCve, mcpRisk, fromKev, fromFamily, fromMcp, scanInjection, INJ_SAMPLE } from "../content/aigen.js";
 import { FAMILIES } from "../content/malware.js";
 
@@ -15,6 +15,9 @@ let news = [], mcp = [], aiCves = [], scenarios = [], tag = "all", sc = 0, step 
 export async function mount(sec) {
   html(sec, `<div class="vh"><h1>AI lab</h1><p>What changed in AI this week that a defender should know, built fresh from live feeds every few hours. No canned demos.</p></div>
   <div class="ai-kpis" id="aiKpis"></div>
+  <section class="panel agentic"><div class="ph"><h3>When attackers have agents too</h3><span class="muted small">what changes for defenders</span></div>
+    <div class="agentic-grid" id="agentic"></div>
+    <p class="small">The answer isn't more alerts, it's less to find. <a class="link" href="#playbook">Try the Surface audit</a> or read <a class="link" href="https://cyb3rops.medium.com/the-age-of-defensive-minimalism-b882c2c7144c" target="_blank" rel="noopener noreferrer">Florian Roth, The Age of Defensive Minimalism</a>.</p></section>
   <div class="two">
     <div class="panel"><div class="ph"><h3>What's new</h3><span class="muted" id="aiUpd"></span></div><div class="seg" id="aiTags"></div><ul class="wire big" id="aiFeed"></ul></div>
     <div class="stack">
@@ -54,6 +57,7 @@ export async function mount(sec) {
   put($("#aiTags"), TAGS.map(([k, l]) => h("button" + (k === tag ? ".on" : ""), { dataset: { t: k } }, l)));
   $("#aiTags").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; tag = b.dataset.t; [...$("#aiTags").children].forEach((x) => x.classList.toggle("on", x === b)); feed(); });
   put($("#aiQ"), QUESTIONS.map((q) => h("li", q)));
+  put($("#agentic"), AGENTIC.map(([t, d]) => h("div.ag", h("b", t), h("p.small", d))));
   glossary();
   $("#owasp").textContent = "OWASP Top 10 for LLM applications (2025): " + OWASP.map((x, i) => `LLM${String(i + 1).padStart(2, "0")} ${x}`).join(" · ");
   await refresh();

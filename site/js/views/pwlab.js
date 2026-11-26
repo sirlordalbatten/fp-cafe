@@ -15,6 +15,9 @@ function analyse(pw) {
   if (WALKS.some((w) => low.includes(w))) { out.found.push("Contains a keyboard pattern."); bits -= 12; }
   if (/(19|20)\d{2}/.test(pw)) { out.found.push("Contains a year. Attackers append years automatically."); bits -= 8; }
   if (/(summer|winter|spring|autumn|fall)/i.test(pw)) { out.found.push("Season plus year is a password-spraying classic."); bits = Math.min(bits, 18); }
+  if (/(january|february|march|april|june|july|august|september|october|november|december)/i.test(pw)) { out.found.push("A month name. Month plus year is in every spraying list."); bits = Math.min(bits, 18); }
+  const co = String(store.get("pwCompany", "") || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (co.length >= 3 && leet(pw).replace(/[^a-z0-9]/g, "").includes(co)) { out.found.push("Contains your company name. It's the first word an attacker tries against your staff."); bits = Math.min(bits, 16); }
   if (/(.)\1\1/.test(pw)) { out.found.push("Repeated characters add almost nothing."); bits -= 6; }
   if (/^[A-Z][a-z]+\d+[!@#$%^&*]?$/.test(pw)) { out.found.push("Capital, word, digits, symbol: the exact shape every policy produces and every cracker expects."); bits = Math.min(bits, 26); }
   if (pw.length < 10) out.found.push("Short. Length matters more than anything else.");
@@ -33,13 +36,16 @@ export async function mount(sec) {
     <div class="panel"><div class="ph"><h3>How long would it survive?</h3></div>
       <p class="warn">Don't type a password you actually use. Type one like it.</p>
       <div class="row"><input class="search grow" type="password" id="pwIn" placeholder="Try a password" autocomplete="off" spellcheck="false" aria-label="Password to test"><button class="btn sm" id="pwShow">Show</button></div>
+      <label class="sortl">Block my company name <input class="search" id="pwCo" type="text" maxlength="40" placeholder="e.g. Contoso" autocomplete="off" spellcheck="false" aria-label="Company name to block"></label>
       <div class="bar pwbar"><i id="pwMeter"></i></div><div id="pwOut"></div>
       <div class="pp"><p class="lbl">Want a strong one?</p><p class="muted small">Four random words beat most "complex" passwords, and you can actually remember them. Generated with your browser's secure random numbers.</p>
         <div class="row"><button class="btn" id="ppGen">Generate a passphrase</button><code class="ppout" id="ppOut"></code><button class="btn ghost sm" id="ppCopy" hidden>Copy</button></div></div></div>
     <div class="panel"><div class="ph"><h3>Crack a colleague</h3><span class="muted">a new victim every day</span></div><div id="crack"></div></div>
   </div>`);
   const inp = $("#pwIn");
-  inp.addEventListener("input", check); check();
+  inp.addEventListener("input", check);
+  const co = $("#pwCo"); co.value = String(store.get("pwCompany", "") || ""); co.addEventListener("input", () => { store.set("pwCompany", co.value.slice(0, 40)); check(); });
+  check();
   $("#pwShow").addEventListener("click", () => { const show = inp.type === "password"; inp.type = show ? "text" : "password"; $("#pwShow").textContent = show ? "Hide" : "Show"; });
   $("#ppGen").addEventListener("click", () => {
     const a = new Uint32Array(5); crypto.getRandomValues(a);

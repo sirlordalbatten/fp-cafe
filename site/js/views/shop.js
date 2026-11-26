@@ -1,4 +1,4 @@
-// Café shop: hats for your buddy, themes, snacks and a sticker capsule machine. Beans can't be bought.
+// Café shop: hats for your shift partner, themes, snacks and a sticker capsule machine. Beans can't be bought.
 import { $, h, html, put, esc, toast, fmtNum, on } from "../core.js";
 import { sfx, sting } from "../audio.js";
 import { beans, spend, inv, saveInv, profile } from "../state.js";
@@ -19,7 +19,7 @@ export function stickerSVG(s, locked) {
 function roll() { const a = new Uint32Array(2); crypto.getRandomValues(a); const r = a[0] % 100; const tier = r < 5 ? "l" : r < 30 ? "r" : "c"; const pool = STICKERS.filter((s) => s.r === tier); return pool[a[1] % pool.length]; }
 
 export async function mount(sec) {
-  html(sec, `<div class="vh"><h1>Café shop</h1><p>Spend beans on hats for your buddy, themes, snacks and stickers. Beans can't be bought. Most of them come from taking care of yourself and your queue.</p></div>
+  html(sec, `<div class="vh"><h1>Café shop</h1><p>Spend beans on hats for your shift partner, themes, snacks and stickers. Beans can't be bought. Most of them come from taking care of yourself and your queue.</p></div>
   <div class="two">
     <div class="panel wallet"><svg class="ic big"><use href="#i-bean"/></svg><div><span class="muted">your beans</span><div class="bignum" id="shopBeans">0</div></div><div class="buddyprev" id="buddyPrev"></div></div>
     <div class="panel machine"><div class="ph"><h3>Sticker capsule machine</h3><span class="muted small">15 beans · 5% legendary</span></div><div class="mach" id="machine"></div></div>
@@ -34,7 +34,7 @@ function render() {
   if (!$("#shopList")) return;
   $("#shopBeans").textContent = fmtNum(beans);
   const I = inv(); $("#buddyPrev").innerHTML = mascot(profile().buddy, I.hat, "happy", false);
-  const cats = [["hat", "Hats for your buddy"], ["theme", "Themes"], ["snack", "Snacks"]];
+  const cats = [["hat", "Hats for your shift partner"], ["theme", "Themes"], ["snack", "Snacks"]];
   put($("#shopList"), cats.map(([cat, title]) => h("div.panel", h("div.ph", h("h3", title)), h("div.shopgrid", SHOP.filter((s) => s.cat === cat).map((s) => {
     const owned = I.owned.includes(s.id); const active = I.hat === s.id || I.theme === s.id;
     const art = h("span.shopart"); if (cat === "hat") art.innerHTML = `<svg viewBox="0 0 80 80" aria-hidden="true">${hatArt(s.id)}</svg>`; else if (cat === "theme") art.classList.add("sw-" + s.id); else art.append(h("span.snackic", s.n[0]));
@@ -44,7 +44,7 @@ function render() {
 }
 function buy(s) {
   const I = inv();
-  if (s.cat === "snack") { if (!spend(s.c)) return toast("Not enough beans. Finish a quest or two."); saveInv({ snacks: I.snacks + 1 }); sfx("coin"); toast(`${s.n} served. Your buddy is delighted.`); render(); return; }
+  if (s.cat === "snack") { if (!spend(s.c)) return toast("Not enough beans. Finish a quest or two."); saveInv({ snacks: I.snacks + 1 }); sfx("coin"); toast(`${s.n} served. Your shift partner is delighted.`); render(); return; }
   if (!I.owned.includes(s.id)) { if (!spend(s.c)) return toast("Not enough beans. Finish a quest or two."); I.owned.push(s.id); sting("win"); }
   if (s.cat === "hat") I.hat = I.hat === s.id ? "" : s.id;
   if (s.cat === "theme") { I.theme = I.theme === s.id ? "" : s.id; applyTheme(I.theme); }

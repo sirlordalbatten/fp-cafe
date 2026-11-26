@@ -12,6 +12,7 @@ export const INJECTION = {
 };
 
 export const GLOSSARY = [
+  ["Agentic offensive framework", "Attack tooling where AI agents plan, run familiar tools, remember what they found and keep investigating on their own. It makes a patient, close look at any organisation cheap. Defenders answer with less to find."],
   ["Prompt injection", "Text that tries to override an AI's instructions. Direct: typed by the user. Indirect: hidden in content the AI reads, like an email, web page or log line. The number one LLM risk in OWASP's list."],
   ["Jailbreak", "A prompt crafted to get a model to ignore its safety rules. Related to injection, but aimed at the model's guardrails rather than an app's instructions."],
   ["Excessive agency", "Giving an AI more permissions or autonomy than its task needs. If it can delete, someone will eventually trick it into deleting."],
@@ -35,4 +36,13 @@ export const QUESTIONS = [
   "How does it handle instructions hidden in alerts, emails or tickets?",
   "Can it show its evidence for every verdict?",
   "What happens when it's wrong, and how would we know?",
+];
+
+// Short, paraphrased takeaways for defenders. Source linked in the panel.
+export const AGENTIC = [
+  ["Being unique no longer hides you", "Custom apps and internal tools were safe in practice because studying them didn't pay. An agent only needs a few hours of compute."],
+  ["Your history is attack surface", "Old commits, build logs, archived web pages and job adverts were written for a world where nobody read all of it. Agents do."],
+  ["Rare isn't a reason to wait", "Priorities built on what attackers used to bother with assume the old distribution of attention. A low finding matters if it connects to something valuable."],
+  ["The scan looks the same. What follows doesn't", "An agent's first step looks like background noise. Watch for the follow-up: docs read, old endpoints tried, odd responses revisited."],
+  ["Speed of decision is the new gap", "Detection is fast. Deciding whether containment breaks production is slow, and the agent uses that time. Agree in advance what can be contained at once."],
 ];

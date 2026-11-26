@@ -277,7 +277,9 @@ function tool(t) {
     put(box, h("p.muted.small", "Checks for punycode, mixed alphabets, brand lookalikes and security-sounding bolt-ons."), inp, out);
   } else if (t === "jwt") {
     inp.placeholder = "Paste a JWT (header.payload.signature)";
-    inp.value = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJrZXZpbiIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTcwMDAwMDAwMH0.";
+    // Built at runtime so no token-shaped string lives in the source (secret scanners rightly flag those).
+    const b64u = (o) => btoa(JSON.stringify(o)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    inp.value = `${b64u({ alg: "none", typ: "JWT" })}.${b64u({ sub: "kevin", role: "admin", exp: 1700000000 })}.`;
     run((v) => { const [a, b] = v.trim().split("."); const dec = (x) => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(x.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(x.length / 4) * 4, "=")), (c) => c.charCodeAt(0))));
       const hd = dec(a), pl = dec(b); const notes = [];
       if (String(hd.alg).toLowerCase() === "none") notes.push("alg is 'none': unsigned. Any server accepting this is broken.");

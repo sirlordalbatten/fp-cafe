@@ -28,17 +28,17 @@ export function openOnboarding() {
   for (const [k, b] of Object.entries(BUDDIES)) {
     const btn = h("button" + (k === buddy ? ".on" : ""), { type: "button", title: b.d, "aria-pressed": String(k === buddy) });
     const art = h("span.bart"); art.innerHTML = mascot(k, "", "ok", false);
-    btn.append(art, h("span", `${b.n}, ${b.d}`));
+    btn.append(art, h("b", b.n), h("span.bd", b.d));
     btn.addEventListener("click", () => { buddy = k; [...buddies.children].forEach((x) => { x.classList.toggle("on", x === btn); x.setAttribute("aria-pressed", String(x === btn)); }); sfx("pop"); });
     buddies.append(btn);
   }
   const close = modal([
     h("h2", "Welcome to FP Café"),
-    h("p.muted", "A few questions so your buddy, digest and detections fit you. Stored only in this browser. You can skip."),
+    h("p.muted", "A few questions so your shift partner, digest and detections fit you. Stored only in this browser. You can skip."),
     h("div.field", h("label.l", { for: "oName" }, "What should we call you?"), name),
     h("div.field", h("span.l", "Your role"), role), h("div.field", h("span.l", "Your SIEM"), siem),
     h("div.field", h("span.l", "What's in your stack? Pick any. The CVE menu can filter to just these."), stack),
-    h("div.field", h("span.l", "Humour"), humor), h("div.field", h("span.l", "Pick your buddy"), buddies),
+    h("div.field", h("span.l", "Humour"), humor), h("div.field", h("span.l", "Pick your shift partner"), buddies),
     h("div.row", h("button.btn.primary", { onclick: () => {
       const first = !p.onboarded;
       saveProfile({ name: name.value.replace(/[<>]/g, "").trim().slice(0, 24), role: role.value(), siem: siem.value(), stack: stack.value(), humor: humor.value(), buddy, onboarded: true });

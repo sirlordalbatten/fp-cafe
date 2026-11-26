@@ -160,6 +160,17 @@ const S = [
     ]);
     return { m: v[1], a: v[0], w: v[2], ch: P(r, ["walk", "phone", "chat"]) };
   },
+  // Agents taking a closer look: what follows the scan decides it
+  (r) => {
+    const v = P(r, [
+      ["close", "The WAF shows a port scan from a cloud IP. Nothing else from it since.", "One scan and silence is background noise. Note it and close."],
+      ["soc", "A port scan from a cloud IP, then it read our API docs, found the old v0 endpoint and paged through 400 records.", "That's an investigation, not noise: someone found a forgotten endpoint and pulled data. Ours, now. Then retire v0."],
+      ["soc", "Someone opened a pull request on our public tools repo. It's a 'small fix' that downloads a binary during the build.", "A malicious contribution to code you publish. Don't merge, check whether any build already ran it, and review who has merge rights."],
+      ["soc", "A researcher emailed: our old website's JavaScript in the Wayback Machine has an API key in it. Is it still live?", "Assume yes until proven otherwise. Rotate the key, check what used it, then hunt your history for others."],
+      ["ir", "The forgotten staging server answered a login with dev/dev, and now there's outbound traffic from it to a hosting IP.", "Default credentials on a forgotten host with live outbound traffic: an active intrusion. Escalate and isolate."],
+    ]);
+    return { m: v[1], a: v[0], w: v[2], ch: P(r, ["chat", "email"]), f: P(r, ["priya", "dan"]) };
+  },
   // AI tools at work
   (r) => {
     const v = P(r, [

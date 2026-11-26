@@ -18,6 +18,11 @@ if grep -nEo '(src|href)\s*=\s*"https?://[^"]+' $HTML; then bad "external resour
 if grep -nEo '@import|url\(\s*["'"'"']?https?://' $S/css/*.css; then bad "external resource in CSS"; else ok "no external resources in CSS"; fi
 # 5. Dangerous JS sinks
 if grep -nE '\beval\s*\(|new Function\s*\(|document\.write\s*\(|insertAdjacentHTML|outerHTML\s*=|setTimeout\s*\(\s*["'"'"'`]' $JS; then bad "dangerous JS sink"; else ok "no eval/Function/document.write/string timers"; fi
+# 5a. every front-end module parses as an ES module (catches a typo before it blanks a page)
+if command -v node >/dev/null; then
+  BADJS=$(find $S/js -name '*.js' | while read -r f; do node --check --input-type=module < "$f" >/dev/null 2>&1 || echo "$f"; done)
+  if [ -n "$BADJS" ]; then echo "$BADJS"; bad "JavaScript syntax error"; else ok "all JavaScript modules parse"; fi
+fi
 # 5b. innerHTML only in reviewed files (static art and trusted templates; data always goes through textContent or esc())
 ALLOW=$(grep -v '^#' scripts/innerhtml-allowlist.txt 2>/dev/null)
 BADHTML=$(grep -rln 'innerHTML' $S/js | while read -r f; do echo "$ALLOW" | grep -qx "${f#$S/}" || echo "$f"; done)

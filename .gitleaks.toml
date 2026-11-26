@@ -7,3 +7,6 @@ useDefault = true
 [allowlist]
 description = "Public data written by the refresh pipeline"
 paths = ['''^site/data/.*\.json$''']
+# A fake, unsigned (alg "none") demo JWT that shipped in an earlier commit of the toolbox.
+# The current code builds its sample at runtime; this entry keeps the full-history scan green.
+regexes = ['''eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0\.eyJzdWIiOiJrZXZpbiIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTcwMDAwMDAwMH0\.''']

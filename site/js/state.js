@@ -14,7 +14,7 @@ export function profile() {
     siem: SIEMS.includes(p.siem) ? p.siem : "Sentinel / Defender",
     stack: arr(p.stack).filter((x) => typeof x === "string").slice(0, 12),
     humor: HUMOR.includes(p.humor) ? p.humor : "dry",
-    buddy: KINDS.includes(p.buddy) ? p.buddy : "cat",
+    buddy: KINDS.includes(p.buddy) ? p.buddy : ({ cat: "dex", owl: "noor", fox: "juno", panda: "theo" }[p.buddy] || "sunny"),
     callsign: /^[A-Za-z0-9_-]{3,16}$/.test(p.callsign) ? p.callsign : "",
     team: /^[A-Z0-9]{3,12}(-[A-Z0-9]{2,12})?$/.test(p.team) ? p.team : "",
     boards: p.boards === true,

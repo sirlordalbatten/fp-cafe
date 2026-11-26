@@ -1,8 +1,7 @@
 /* FP Café v3: dashboard, sector radar, new tools and tabs. Builds on app.css + v2.css tokens. */
 
 /* ---------- lounge dashboard ---------- */
-.dash{margin:22px 0}
-.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:0 0 18px}
 @media (max-width:1200px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:620px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .kpi{display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s}
@@ -154,3 +153,88 @@ textarea.short.tall{min-height:140px}
 .metrics dd{margin:2px 0 0;font-size:13.5px;color:var(--muted)}
 @media (max-width:620px){.calc-res{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:760px){.radar-grid .radar{height:96vw}}
+
+/* ---------- shift partners (analyst characters) ---------- */
+.opt.buddies{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.opt.buddies button{flex-direction:column;align-items:center;text-align:center;gap:2px;padding:8px 8px 10px;border-radius:12px}
+.opt.buddies .bart{width:64px;height:64px;display:block}
+.opt.buddies .bart svg{width:100%;height:100%}
+.opt.buddies b{font-size:14px}
+.opt.buddies .bd{font-size:11.5px;line-height:1.3;opacity:.85}
+@media (max-width:560px){.opt.buddies{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.brand{grid-template-columns:32px 1fr}
+.brand-mark{width:32px;height:32px;border:0;border-radius:9px;box-shadow:0 4px 14px -4px #FF8A3D88}
+
+
+/* ---------- lounge dashboard (v3.2) ---------- */
+.dhead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:0 0 16px}
+.dhead h1{font:800 clamp(28px,3.4vw,40px)/1.05 var(--display);margin:0}
+.dhead p{margin:4px 0 0}
+.kpi .kn{font-size:28px}
+.dcols{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:18px}
+.dcol{display:flex;flex-direction:column;gap:16px;min-width:0}
+.dcol>.panel{margin:0}
+@media (max-width:1250px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.dcols{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.dcol.c3{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:900px){.dcol.c3{grid-template-columns:1fr}}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.dcols{grid-template-columns:1fr}.dhead{flex-direction:column;align-items:flex-start}}
+.w-charts{position:relative}
+.ph2{margin-top:18px}
+.w-patch .pf{grid-template-columns:1fr;padding-left:22px;gap:4px}
+.w-patch .pf li{border-bottom:1px solid var(--rule)}
+.w-patch .pf li:last-child{border-bottom:0}
+.pf-top{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%}
+.pf-top b{font-size:14.5px}
+.pf-top .pill{font-size:10.5px;flex:none}
+.vbars{display:flex;align-items:flex-end;gap:3px;height:130px;border-bottom:1px solid var(--rule);padding-top:6px}
+.vb{flex:1;height:100%;display:flex;align-items:flex-end;background:none;border:0;padding:0;cursor:pointer;min-width:0}
+.vb-f{display:block;width:100%;background:color-mix(in srgb,var(--alarm) 72%,transparent);border-radius:3px 3px 0 0}
+.vb.today .vb-f{background:var(--alarm)}
+.vb:hover .vb-f,.vb:focus-visible .vb-f{background:var(--sodium)}
+.vb:focus-visible{outline:2px solid var(--sodium);outline-offset:1px}
+.vb.zero{cursor:default}
+.vaxis{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px}
+.ctip{position:absolute;z-index:5;pointer-events:none;background:var(--paper);color:var(--paper-ink);font:600 12.5px var(--body);padding:5px 9px;border-radius:6px;max-width:260px;box-shadow:0 8px 24px -8px #000}
+.hbars li{grid-template-columns:minmax(90px,11em) 1fr 2.4em}
+.hbars .bar-fill{background:var(--alarm)}
+.rwf{background:var(--hof)}
+.hl{list-style:none;margin:0;padding:0}
+.hl li{padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px;line-height:1.4}
+.hl li:last-child{border-bottom:0}
+.hl .hm{display:block;font-size:12.5px;color:var(--muted)}
+.w-partner .petwrap .mascot{width:96px;height:96px}
+.w-partner .mascot svg{width:100%;height:100%}
+.w-partner .moods{margin-top:12px}
+.board.compact{padding:14px 18px 10px}
+.board.compact .board-head{align-items:center;margin-bottom:8px}
+.board.compact .board-title{font-size:38px}
+.board.compact .board-foot{margin:0 0 0 auto}
+.board.compact .fl{font-size:15px}
+.dgrid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}
+.dgrid2>.panel{margin:0}
+@media (max-width:900px){.dgrid2{grid-template-columns:1fr}}
+
+.bar-btn{background:none;border:0;padding:0;color:var(--text);font-size:13.5px;cursor:pointer}
+.bar-btn:hover,.bar-btn:focus-visible{color:var(--phos)}
+
+/* ---------- surface audit ---------- */
+#pbMode{margin-bottom:14px}
+#pbAudit .panel{margin:0 0 16px}
+.places{list-style:none;padding:0;margin:10px 0 0}
+.places li{padding:7px 0;border-bottom:1px solid var(--rule)}
+.places .blk{display:block;margin-top:2px}
+.audit-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.audit-form .inp:first-child{grid-column:1/-1}
+.audit-form .btn{justify-self:start}
+.audit-form select{padding:9px 10px}
+@media (max-width:700px){.audit-form{grid-template-columns:1fr}}
+.audit-sum{font-weight:700;color:var(--sodium);margin:10px 0 4px}
+.audit-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.audit-row p{margin:2px 0}
+.audit-v{display:flex;gap:6px;align-items:flex-start}
+.pill.p-unk{white-space:nowrap}
+.agentic{margin:0 0 20px}
+.agentic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:6px 0 10px}
+.ag{border-left:3px solid var(--phos);padding:2px 0 2px 12px}
+.ag p{margin:4px 0 0;color:var(--muted)}
+#pwCo{width:180px;margin-left:6px}
+.opt.buddies button .bart{width:78px;height:78px}
