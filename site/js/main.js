@@ -9,9 +9,9 @@ import { startIncidents } from "./incidents.js";
 import { startNudges } from "./views/shift.js";
 import { startDesk } from "./views/desk.js";
 import { applyTheme } from "./views/shop.js";
-import { openOnboarding } from "./onboarding.js";
+import { openOnboarding, meetTheTeam } from "./onboarding.js";
 
-const VIEWS = ["lounge", "desk", "brew", "menu", "malware", "ai", "detect", "playbook", "phishsim", "arcade", "boards", "socdle", "tycoon", "pwlab", "breakroom", "shift", "learn", "shop", "me"];
+const VIEWS = ["lounge", "desk", "brew", "menu", "malware", "ai", "detect", "toolbox", "playbook", "phishsim", "arcade", "boards", "socdle", "tycoon", "pwlab", "breakroom", "shift", "learn", "certs", "shop", "me"];
 const mods = {};
 let current = null;
 
@@ -85,7 +85,7 @@ async function liveData() {
 // Keep an all-day tab current: every 15 minutes re-fetch the data files. The view on screen redraws
 // itself (if it knows how); data-only views that are mounted but hidden are rebuilt next time they're opened.
 let lastRefresh = Date.now();
-const REBUILD = new Set(["brew", "menu", "malware", "ai", "detect", "playbook", "phishsim"]);
+const REBUILD = new Set(["brew", "menu", "malware", "ai", "detect", "playbook", "phishsim", "certs"]);
 async function liveRefresh() {
   if (document.visibilityState !== "visible") return;
   lastRefresh = Date.now();
@@ -167,6 +167,7 @@ function boot() {
   startNudges();
   load("cves").then(startDesk);
   if (!profile().onboarded) setTimeout(openOnboarding, 700);
+  else if (!store.get("teamSeen", false)) setTimeout(meetTheTeam, 900);
   if (v.streak >= 2 && store.get("streakToast", "") !== new Date().toDateString()) { store.set("streakToast", new Date().toDateString()); toast(`${v.streak}-day visit streak. The coffee's on us.`); }
 }
 boot();

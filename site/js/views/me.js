@@ -1,12 +1,13 @@
-// My corner: level, badges, mood week, visits, stickers, watchlist, leaderboard settings, your data.
-import { $, h, html, put, store, todayKey, toast, copyText, modal, obj } from "../core.js";
-import { profile, saveProfile, level, stats, moods, visit, inv } from "../state.js";
-import { openOnboarding } from "../onboarding.js";
+// My corner: your shift partner, check-in, daily quests, horoscope, level, badges, mood week, visits, stickers, watchlist, your data.
+import { $, h, html, put, store, todayKey, toast, copyText, modal, obj, icon, pick, pickDay, seedFrom, mulberry32, on } from "../core.js";
+import { profile, saveProfile, level, stats, moods, visit, inv, quests, setMood, todayMood, earn, xp } from "../state.js";
+import { sfx } from "../audio.js";
+import { openOnboarding, partnerPicker } from "../onboarding.js";
 import { joinBoards } from "../board.js";
 import { load, cveList } from "../data.js";
 import { card, watchlist } from "../cvecard.js";
 import { stickerSVG } from "./shop.js";
-import { MOODS, STICKERS } from "../content/legacy.js";
+import { MOODS, STICKERS, MOOD_REPLY, HORO, BUDDIES } from "../content/legacy.js";
 
 const BADGES = [
   ["tickets", 1, "First ticket", "Route a ticket at the desk"], ["tickets", 50, "Queue whisperer", "Route 50 tickets"], ["bounced", 10, "Not my department", "Bounce 10 tickets to IT or Network"],
@@ -19,6 +20,12 @@ const BADGES = [
 
 export async function mount(sec) {
   html(sec, `<div class="vh"><h1>My corner</h1><p>Your level, badges, mood week and watchlist. It all lives in this browser: no account, nothing to leak.</p></div>
+  <div class="panel"><div class="ph"><h3>Your shift partner</h3><span class="muted small" id="partnerNow"></span></div><div id="partnerPick"></div></div>
+  <div class="three">
+    <div class="panel"><div class="ph"><h3>How are you, really?</h3></div><div class="moods" id="moods"></div><p class="muted small" id="moodReply"></p></div>
+    <div class="panel"><div class="ph"><h3>Daily quests</h3></div><div id="quests"></div></div>
+    <div class="panel"><div class="ph"><h3>Shift horoscope</h3><span class="muted" id="horoRole"></span></div><p id="horo" class="horo"></p><p class="muted small" id="lucky"></p></div>
+  </div>
   <div class="three">
     <div class="panel"><div class="ph"><h3>Level</h3></div><div class="lvl"><div class="lvlnum" id="lvlNum">1</div><div><p class="lvltitle" id="lvlTitle"></p><p class="muted" id="lvlXp"></p></div></div><div class="bar"><i id="lvlBar"></i></div></div>
     <div class="panel"><div class="ph"><h3>Your mood week</h3></div><div class="week" id="week"></div><p class="small" id="weekNote"></p></div>
@@ -35,6 +42,8 @@ export async function mount(sec) {
     <p class="muted">Move your progress to another browser: copy it here, paste it there. Nothing touches a server.</p>
     <div class="row"><button class="btn sm" id="expBtn">Copy my data</button><button class="btn sm" id="impBtn">Import</button><button class="btn ghost sm" id="wipeBtn">Erase everything</button></div></div>`);
   $("#editProf").addEventListener("click", openOnboarding);
+  partnerUI(); moodsUI(); questsUI(); horoscope();
+  on("stat", questsUI); on("quests", questsUI); on("mood", questsUI); on("profile", () => { horoscope(); partnerUI(); });
   $("#expBtn").addEventListener("click", exportData); $("#impBtn").addEventListener("click", importData); $("#wipeBtn").addEventListener("click", wipe);
   show();
 }
@@ -83,4 +92,31 @@ function importData() {
 function wipe() {
   const close = modal([h("h2", "Erase everything?"), h("p", "Beans, level, stickers, streaks, checklist and settings in this browser will be gone. Leaderboard scores already submitted stay on the board."),
     h("div.row", h("button.btn.danger", { onclick: () => { for (const k of Object.keys(localStorage)) if (k.startsWith("fpc2_")) localStorage.removeItem(k); close(); location.hash = "#lounge"; location.reload(); } }, "Erase"), h("button.btn.ghost", { onclick: () => close() }, "Keep my stuff"))], { label: "Erase data" });
+}
+
+// ---------- shift partner, check-in, quests, horoscope ----------
+function partnerUI() {
+  const box = $("#partnerPick"); if (!box) return; const p = profile();
+  $("#partnerNow").textContent = BUDDIES[p.buddy] ? `${BUDDIES[p.buddy].n} is on shift with you` : "";
+  put(box, partnerPicker(p.buddy, (k) => { saveProfile({ buddy: k }); store.set("teamSeen", true); toast(`${BUDDIES[k].n} is on shift with you.`); $("#partnerNow").textContent = `${BUDDIES[k].n} is on shift with you`; }));
+}
+function horoscope() {
+  if (!$("#horo")) return; const p = profile(); const pool = HORO[p.role] || HORO["L1 analyst"];
+  $("#horoRole").textContent = p.role;
+  $("#horo").textContent = pickDay(pool, seedFrom(p.role) % 97);
+  const r = mulberry32(seedFrom(todayKey() + p.role));
+  $("#lucky").textContent = `Lucky port ${pick([22, 53, 443, 445, 3389, 8080, 5985, 1337, 4444, 31337], r)} · lucky event ID ${pick([4624, 4688, 4720, 4769, 7045, 1102, 4104, 4625], r)} · avoid ${pick(["change freezes", "Friday deploys", "the CISO's calendar", "reply-all", "the printer", "untested backups"], r)}`;
+}
+function questsUI() {
+  const box = $("#quests"); if (!box) return;
+  put(box, quests().map((q) => h("a.quest" + (q.done ? ".done" : ""), { href: q.go }, h("span.qbox", q.done ? icon("check") : ""), h("span.qt", q.t), h("span.qn.muted", `${q.have}/${q.n}`))));
+}
+function moodsUI() {
+  const box = $("#moods"); if (!box) return; const cur = todayMood();
+  put(box, MOODS.map((m, i) => h("button.moodb" + (cur === i ? ".on" : ""), { "aria-pressed": String(cur === i), onclick: () => {
+    const first = todayMood() === null; setMood(i); moodsUI(); sfx("pop");
+    $("#moodReply").textContent = MOOD_REPLY[i] || "";
+    if (first) { earn(3, "mood"); xp(5, "mood"); }
+  } }, h("span.mface.m" + i), h("span", m[1]))));
+  if (cur !== null) $("#moodReply").textContent = MOOD_REPLY[cur] || "";
 }

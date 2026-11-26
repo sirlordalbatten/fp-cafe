@@ -65,7 +65,26 @@ const CLEAN = {
   ransomware(d) {
     const pairs = (v, n) => arr(v).filter((p) => Array.isArray(p) && p.length === 2).slice(0, n).map((p) => [t(p[0], 60), num(p[1], 0, 0)]);
     return { generated: isoOk(d.generated), status: cleanStatus(d.status), total7: num(d.total7, 0), total30: num(d.total30, 0),
-      groups7: pairs(d.groups7, 15), groups30: pairs(d.groups30, 20), sectors30: pairs(d.sectors30, 10), countries30: pairs(d.countries30, 12), daily: pairs(d.daily, 31) };
+      groups7: pairs(d.groups7, 15), groups30: pairs(d.groups30, 20), sectors30: pairs(d.sectors30, 10), countries30: pairs(d.countries30, 40), daily: pairs(d.daily, 31) };
+  },
+  threatmap(d) {
+    const CC = /^[A-Z]{2}$/;
+    const c2 = obj(d.c2); const r = obj(d.radar);
+    const ccPairs = (v, n) => arr(v).filter((p) => Array.isArray(p) && p.length === 2 && CC.test(p[0])).slice(0, n).map((p) => [p[0], num(p[1], 0, 0)]);
+    return { generated: isoOk(d.generated), status: cleanStatus(d.status), infocon: ["green", "yellow", "orange", "red"].includes(d.infocon) ? d.infocon : "",
+      c2: { total: num(c2.total, 0, 0), online: num(c2.online, 0, 0), countries: ccPairs(c2.countries, 40),
+        malware: arr(c2.malware).filter((p) => Array.isArray(p) && p.length === 2).slice(0, 8).map((p) => [t(p[0], 40), num(p[1], 0, 0)]) },
+      ports: arr(d.ports).filter((p) => Array.isArray(p) && p.length === 4).slice(0, 10).map((p) => p.map((x) => num(x, 0, 0))),
+      radar: d.radar ? { pairs: arr(r.pairs).filter((p) => Array.isArray(p) && p.length === 3 && CC.test(p[0]) && CC.test(p[1])).slice(0, 30).map((p) => [p[0], p[1], num(p[2], 0, 0)]),
+        origins: ccPairs(r.origins, 10), targets: ccPairs(r.targets, 10) } : null };
+  },
+  certs(d) {
+    const P = ["blue", "red", "cloud", "dfir", "grc", "start"], L = ["entry", "mid", "adv"], F = ["lab", "mcq", "mixed"];
+    return { generated: isoOk(d.generated), checked: isoOk(d.checked), status: cleanStatus(d.status),
+      certs: arr(d.certs).filter((c) => P.includes(c?.path) && L.includes(c.level) && F.includes(c.fmt) && url(c.u)).map((c) => ({
+        id: t(c.id, 20), n: t(c.n, 80), by: t(c.by, 40), path: c.path, level: c.level, fmt: c.fmt, focus: t(c.focus, 200),
+        tips: arr(c.tips).map((x) => t(x, 160)).slice(0, 4), u: c.u, ok: c.ok !== false })).slice(0, 80),
+      news: arr(d.news).map((i) => ({ t: t(i?.t, 200), u: url(i?.u), s: t(i?.s, 60), d: isoOk(i?.d) || "" })).filter((i) => i.u).slice(0, 12) };
   },
   detections(d) {
     const LV = ["informational", "low", "medium", "high", "critical"];

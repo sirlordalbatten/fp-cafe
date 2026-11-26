@@ -7,25 +7,27 @@
 ## What's inside
 | Section | What it does | Freshness |
 |---|---|---|
-| **Lounge** | A dashboard: six headline numbers, a "Patch first" list, exploited CVEs per day (30 days), where they hit by technology area, quick indicator lookup with TI pivots, headlines, ransomware and AI/MCP activity, your shift partner, a compact arrivals board, quests and pager. Open tabs re-fetch data every 15 minutes | every 3 h |
+| **Lounge** | Live threat dashboard: an animated world map (Cloudflare Radar attack flows, ransomware victims by country, botnet C2 servers), Infocon level, KPI tiles with 30-day sparklines, "Patch first", most-scanned ports (SANS ISC), ransomware groups, the arrivals board and pager. Open tabs re-fetch every 15 minutes | every 3 h |
 | **The desk** | Tickets walk in while the tab is open. Route them, bounce them to IT or Network, keep the CISO calm, swear at your tools | combinatorial scenes with generated colleagues, where one detail decides the route, plus templates and live CVEs and news |
 | **Morning brew** | A two-minute digest: three things to know, numbers for your manager, the latest headlines | every 3 h |
 | **CVE menu** | Every CISA KEV entry from the last 120 days plus new critical CVEs from NVD, scored with EPSS, filterable by your stack. A "Patch first" list and vendor advisory links | every 3 h |
 | **Malware bar** | 32 curated family profiles (how it gets in, what you'll see, how to hunt it) with live activity from Malpedia, abuse.ch and news mentions, plus ransomware leak-site activity (groups, sectors, countries, daily posts; counts only, never victim names) from ransomware.live | every 3 h |
 | **AI lab** | Built from live data: AI news, AI-product CVEs, the newest MCP registry servers with a capability and risk read-out, agent walkthroughs generated from today's KEV entry, an active malware family and a new MCP server (with a prompt-injection toggle), and a prompt-injection scanner | every 3 h |
 | **Detection lab** | The newest rules from SigmaHQ, Splunk Security Content, Microsoft Sentinel and Google SecOps, plus curated playbooks with triage and tuning notes | every 3 h |
-| **SOC playbook** | 22 practices from well-run SOCs (Palantir ADS, MITRE 11 Strategies, NCSC, Google SRE and ASO, PEAK, CISA, NIST 800-61r3, GitLab) and from Florian Roth's *The Age of Defensive Minimalism*, each with its source and a first-week version; a self-check; a **Surface audit** (where an agent would look first, and a keep/narrow/remove review of everything you expose); and a live feed from SOC team blogs | every 3 h |
+| **Toolbox** | Lookup with TI pivots, SafeLinks/Proofpoint unwrapper, IOC extractor, email header analyser, URL parser, lookalike/punycode checker, decode, defang, time, JWT, CIDR, hash ID. All in the browser | |
+| **SOC playbook** | 16 practices from well-run SOCs (Palantir ADS, MITRE 11 Strategies, NCSC, Google SRE and ASO, PEAK, CISA, NIST 800-61r3, GitLab), each with its source and a first-week version; a self-check; a **Surface audit** (where an attacker would look first, and a keep/narrow/remove review of what you expose, inspired by Florian Roth's defensive minimalism); and a live feed from SOC team blogs | every 3 h |
 | **Phish sim** | Awareness campaign planner: briefs with red flags to teach (never send-ready kits), ethics rules, a year of themes, this week's real lures from the news, and a results calculator focused on report rate | |
 | **Arcade** | Five games (Swipe the phish, Alert rush, Contain the worm, Needle in the logs, Firewall frenzy) with a daily challenge | |
 | **Leaderboards** | Global, team and daily boards, updated live, with server-side anti-cheat | live |
 | **SOCdle** | A daily five-letter security word with the category shown up front, up to two letter reveals and a word list that greys out what you've ruled out, plus a decode puzzle | daily |
 | **SOC tycoon** | Build a SOC: hire, automate, take client contracts, survive incidents, avoid burnout | |
 | **Password lab** | A strength checker that explains why, a passphrase generator, and a daily "crack a colleague" with a shape hint, a character mask and how-close feedback | daily |
-| **Shift buddy** | Custom shift hours (including overnight), break plan, essential nudges, a checklist with suggestions, a handover builder, wellbeing nudges (posture, water, movement, meals, caffeine cut-off, teammate check-ins, night-shift sleep prep), and an analyst toolbox: link unwrapper (SafeLinks, Proofpoint v1–v3, Google, Barracuda), IOC extractor, TI pivots, email header analyser, URL parser, lookalike/punycode checker, time converter, defang, decode, JWT, CIDR, hash ID | |
-| **Snack lessons** | 29 hands-on micro-labs (noise vs agent scrutiny, defensive minimalism, BEC, OAuth consent, golden tickets, Linux auth logs, web logs, CloudTrail, KQL, ransomware first hour, EDR tampering, ticket writing, DMARC and more), filterable by topic, plus a daily lab from the newest KEV entry | daily |
+| **Shift buddy** | Custom shift hours (including overnight), break plan, wellbeing nudges (posture, water, movement, meals, caffeine cut-off, teammate check-ins, night-shift sleep prep), a checklist you can edit, handover builder and focus timer | |
+| **Snack lessons** | 29 hands-on micro-labs (noise vs agent scrutiny, shrinking the attack surface, BEC, OAuth consent, golden tickets, Linux auth logs, web logs, CloudTrail, KQL, ransomware first hour, EDR tampering, ticket writing, DMARC and more), filterable by topic, plus a daily lab from the newest KEV entry | daily |
+| **Certifications** | Blue, red, cloud, DFIR and leadership roadmaps (24 certs) with practical tips, a personal plan and cert news. Official links re-checked weekly; no prices or exam codes that go stale | weekly |
 | **Pop incidents** | Short timed scenarios generated from templates and live data, so they rarely repeat | |
 
-Your shift partner is one of six analyst characters (Sunny, Dex, Rin, Theo, Juno, Noor), each with their own personality and lines.
+Your shift partner is one of six analysts (Sunny, Dex, Rin, Theo, Juno, Noor), each with their own personality and lines. Pick or switch in My corner.
 
 Sound is synthesised in the browser with the Web Audio API (no audio files), and only starts after you click something.
 

@@ -1,206 +1,239 @@
-// Lounge: the dashboard you keep open all shift. Today's numbers, what to patch first, two plain charts,
-// a quick indicator lookup, headlines, ransomware activity, the arrivals board and your shift partner.
-import { $, h, html, ext, put, on, RM, seedFrom, mulberry32, pick, pickDay, daysSince, ago, store, todayKey, fmtNum, copyText, toast, modal, pad, nextPatchTuesday, icon } from "../core.js";
-import { classify, pivots, TYPE_NAME, defang } from "../ti.js";
+// Lounge: the live dashboard. A world threat map, the numbers that matter, what to patch first,
+// what the internet is scanning, who ransomware gangs are hitting, the arrivals board and the pager.
+import { $, h, html, ext, put, on, RM, ago, store, fmtNum, modal, nextPatchTuesday, daysSince, seedFrom, mulberry32, pick, pickDay, todayKey } from "../core.js";
 import { load, cveList } from "../data.js";
 import { detail, status, productName, isEdge } from "../cvecard.js";
 import { clatter, sfx } from "../audio.js";
-import { profile, quests, setMood, todayMood, bump, earn, xp, buddyInfo } from "../state.js";
+import { profile } from "../state.js";
 import { drill } from "../incidents.js";
 import { shiftState } from "./shift.js";
-import { HORO, MOODS, MOOD_REPLY } from "../content/legacy.js";
 
-let cves = [], news = null, mal = null, rw = null, stats = {};
-let page = 0, flapTimer = 0, clockTimer = 0;
+let cves = [], news = null, rw = null, tm = null, cvesRaw = null, stats = {};
+let page = 0, flapTimer = 0, clockTimer = 0, world = null, mapPaused = false;
 const FLAP_CH = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./";
+const SVGNS = "http://www.w3.org/2000/svg";
+const PORTS = { 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS", 80: "HTTP", 81: "HTTP", 123: "NTP", 161: "SNMP", 443: "HTTPS", 445: "SMB", 1433: "MSSQL", 1900: "SSDP", 2323: "Telnet", 2375: "Docker API", 3306: "MySQL", 3389: "RDP", 5060: "SIP", 5432: "PostgreSQL", 5555: "Android ADB", 5900: "VNC", 6379: "Redis", 6443: "Kubernetes", 7547: "TR-069", 8000: "HTTP", 8080: "HTTP proxy", 8443: "HTTPS", 8888: "HTTP", 9200: "Elasticsearch", 11211: "Memcached", 27017: "MongoDB", 37215: "Huawei router", 52869: "UPnP" };
 
 export async function mount(sec) {
   html(sec, `
-  <header class="dhead"><div><h1 id="hello2">Good shift</h1><p class="muted" id="today"></p></div>
-    <button class="btn ghost sm" id="miDrill"><svg class="ic"><use href="#i-siren"/></svg>Run a drill</button></header>
-  <div class="kpis" id="kpis" aria-label="Today at a glance"></div>
-  <div class="dcols"><div class="dcol c1">
-    <section class="panel w-patch"><div class="ph"><h3>Patch first</h3><a class="link" href="#menu">CVE menu</a></div>
-      <p class="muted small">Exploited in the wild. Ransomware use and internet-facing devices go to the top.</p><ol class="pf" id="pfList"></ol></section>
-
-    <section class="panel w-news"><div class="ph"><h3>Headlines</h3><a class="link" href="#brew">Full brew</a></div><ul class="hl" id="headlines"></ul></section>
-    </div><div class="dcol c2">
-    <section class="panel w-charts"><div class="ph"><h3>Exploited CVEs added per day</h3><span class="muted small" id="perDaySub"></span></div>
-      <div class="vbars" id="perDay" role="img"></div><div class="vaxis" id="perDayAxis" aria-hidden="true"></div>
-      <div class="ph ph2"><h3>Where they hit</h3><span class="muted small">last 30 days, tap a row</span></div><ol class="bars hbars" id="areas"></ol>
-      <div class="ctip" id="ctip" hidden></div></section>
-    <section class="panel w-rw"><div class="ph"><h3>Ransomware this week</h3><a class="link" href="#malware">Malware bar</a></div><ol class="bars" id="rwMini"></ol><p class="muted small" id="rwNote"></p>
-      <div class="ph ph2"><h3>AI and MCP</h3><a class="link" href="#ai">AI lab</a></div><ul class="hl" id="aiMini"></ul></section>
-    </div><div class="dcol c3"><form class="panel w-lookup lookup" id="tiForm" autocomplete="off">
-      <div class="ph"><h3>Quick lookup</h3></div>
-      <p class="muted small">IP, domain, URL, hash, email, CVE or ATT&amp;CK ID. Defanged is fine.</p>
-      <div class="lk-row"><input id="tiIn" class="inp" spellcheck="false" aria-label="Indicator to look up" placeholder="185.220.101.4"><button class="btn">Look up</button></div>
-      <div id="tiOut" class="lk-out" aria-live="polite"></div></form>
-    <section class="panel w-partner buddy"><div class="ph"><h3 id="partnerName">Your shift partner</h3><span class="muted small" id="partnerDesc"></span></div>
-      <div class="buddy-row"><div class="petwrap"><button class="mascot" id="buddy" title="Say hi"></button></div><div class="say" id="say" aria-live="polite">…</div></div>
-      <div class="moods" id="moods"></div><p class="muted small" id="moodReply"></p></section>
-    <div class="panel"><div class="ph"><h3>Today in ten seconds</h3></div><ul class="mini" id="miniBrew"></ul></div>
-  </div></div>
-
-
-
+  <header class="lhead">
+    <div><h1 id="hello2">Good shift</h1><p class="lsub"><span class="infocon" id="infocon" hidden></span><span id="today"></span></p></div>
+    <div class="lpartner"><div class="say" id="say" aria-live="polite"></div><button class="mascot sm" id="buddy" title="Your shift partner"></button></div>
+  </header>
+  <section class="mapcard" aria-label="Live threat map">
+    <div class="map-top">
+      <h2>Threat map</h2>
+      <div class="layers" id="layers"></div>
+      <button class="iconbtn sm" id="mapPause" aria-pressed="false"><span>Pause</span></button>
+    </div>
+    <div class="map-body">
+      <div class="map-wrap" id="mapWrap"><div class="map-tip" id="mapTip" hidden></div></div>
+      <aside class="map-side" id="mapSide"></aside>
+    </div>
+    <p class="map-src" id="mapSrc"></p>
+  </section>
+  <div class="ktiles" id="ktiles"></div>
+  <div class="lgrid">
+    <section class="panel"><div class="ph"><h3>Patch first</h3><a class="link" href="#menu">All CVEs</a></div><ol class="pf" id="pfList"></ol></section>
+    <section class="panel"><div class="ph"><h3>Most-scanned ports</h3><span class="muted small" id="portSrc"></span></div><ol class="bars vbars2" id="ports"></ol></section>
+    <section class="panel"><div class="ph"><h3>Ransomware this week</h3><a class="link" href="#malware">Malware bar</a></div><ol class="bars" id="rwMini"></ol></section>
+  </div>
   <div class="board compact" id="flapBoard" aria-label="Arrivals board of newly exploited CVEs">
     <div class="board-head"><h2 class="board-title">Arrivals</h2><p class="board-foot" id="boardFoot"></p></div>
     <div class="board-cols" aria-hidden="true"><span>CVE</span><span class="col-nk">Flight</span><span class="col-prod">From</span><span>Status</span></div>
     <div class="board-rows" id="flapRows"></div>
   </div>
-  <div class="dgrid2">
-    <div class="panel"><div class="ph"><h3>Daily quests</h3></div><div id="quests"></div></div>
-    <div class="panel"><div class="ph"><h3>Shift horoscope</h3><span class="muted" id="horoRole"></span></div><p id="horo" class="horo"></p><p class="muted small" id="lucky"></p></div>
-  </div>
-  <div class="pager"><span class="pager-label">Pager</span><div class="ticker"><div class="track" id="ticker">Loading headlines…</div></div></div>`);
+  <div class="pager"><span class="pager-label">Pager</span><div class="ticker"><div class="track" id="ticker">Loading headlines…</div></div></div>
+  <div class="lfoot"><button class="btn ghost sm" id="miDrill">Run an incident drill</button></div>`);
 
   $("#miDrill").addEventListener("click", () => drill());
   $("#flapRows").addEventListener("click", (e) => { const r = e.target.closest(".frow"); const c = r && cves.find((x) => x.id === r.dataset.id); if (c) detail(c); });
   $("#flapRows").addEventListener("keydown", (e) => { if (e.key === "Enter") { const r = e.target.closest(".frow"); const c = r && cves.find((x) => x.id === r.dataset.id); if (c) detail(c); } });
-  $("#tiForm").addEventListener("submit", (e) => { e.preventDefault(); lookup($("#tiIn").value); });
-  moodsUI(); questsUI(); horoscope(); partner();
-  on("stat", questsUI); on("quests", questsUI); on("mood", questsUI); on("profile", () => { horoscope(); partner(); greet(); });
+  $("#mapPause").addEventListener("click", () => { mapPaused = !mapPaused; $("#mapWrap").classList.toggle("paused", mapPaused); $("#mapPause").setAttribute("aria-pressed", String(mapPaused)); $("#mapPause span").textContent = mapPaused ? "Play" : "Pause"; });
+  on("profile", greet);
   const b = await import("../buddy.js"); b.initBuddy();
-  greet(); clearInterval(clockTimer); clockTimer = setInterval(() => { if (location.hash.replace("#", "") === "lounge" || !location.hash) { greet(); kpis(); } }, 60000);
-  const [c, n, m, r] = await Promise.all([load("cves"), load("news"), load("malware"), load("ransomware")]);
-  apply(c, n, m, r);
+  greet(); clearInterval(clockTimer); clockTimer = setInterval(() => { if (location.hash.replace("#", "") === "lounge" || !location.hash) greet(); }, 60000);
+  world = await import("../content/world.js");
+  const [c, n, r, t] = await Promise.all([load("cves"), load("news"), load("ransomware"), load("threatmap")]);
+  apply(c, n, r, t);
   clearInterval(flapTimer);
   flapTimer = setInterval(() => { if (document.visibilityState === "visible" && location.hash.replace("#", "") === "lounge") { page++; board(true); } }, 60000);
 }
 export function show() { if (cves.length) board(false); greet(); }
 export async function refresh() {
-  const [c, n, m, r] = await Promise.all([load("cves"), load("news"), load("malware"), load("ransomware")]);
-  apply(c, n, m, r);
+  const [c, n, r, t] = await Promise.all([load("cves"), load("news"), load("ransomware"), load("threatmap")]);
+  apply(c, n, r, t);
 }
-function apply(c, n, m, r) {
-  news = n; mal = m; rw = r; stats = c ? c.stats : {};
+function apply(c, n, r, t) {
+  cvesRaw = c; news = n; rw = r; tm = t; stats = c ? c.stats : {};
   cves = cveList(c);
-  kpis(); patchFirst(); perDay(c); areas(); headlines(); rwMini(); board(true); brief(); ticker();
+  map(); tiles(); patchFirst(); ports(); rwMini(); board(true); ticker();
+  const ic = $("#infocon"); if (tm?.infocon) { ic.hidden = false; ic.className = "infocon ic-" + tm.infocon; ic.textContent = `Infocon ${tm.infocon}`; ic.title = "SANS Internet Storm Center threat level"; }
 }
 
-// ---------- header and numbers ----------
+// ---------- header ----------
 function greet() {
   const p = profile(); const hr = new Date().getHours();
-  const part = hr < 5 ? "Hello, night owl" : hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
+  const part = hr < 5 ? "Night shift" : hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
   $("#hello2").textContent = p.name ? `${part}, ${p.name}` : part;
   const st = shiftState(); const d = new Date();
-  $("#today").textContent = `${d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })} · ` +
-    (st.on ? `on shift, ${Math.max(0, Math.round((st.e - d) / 6e4 / 6) / 10)} h to go` : "off shift. Set your hours in Shift buddy.");
-}
-function kpis() {
-  const box = $("#kpis"); if (!box) return;
-  const last = stats.lastEdge; const days = last ? Math.max(0, daysSince(last + "T00:00:00Z")) : null;
-  const pt = nextPatchTuesday(new Date()); const ptd = Math.ceil((pt - new Date()) / 864e5);
-  const grp = rw?.groups7?.[0];
-  const tile = (href, n, label, sub, tone) => h("a.kpi" + (tone ? "." + tone : ""), { href }, h("span.kn", String(n)), h("span.kl", label), sub ? h("span.ks", sub) : null);
-  put(box,
-    tile("#menu", stats.kevAdded7 ?? "–", "exploited CVEs added this week", stats.kevAdded30 != null ? `${stats.kevAdded30} in 30 days` : "", stats.kevAdded7 >= 5 ? "hot" : ""),
-    tile("#menu", stats.criticalNew7 ?? "–", "new critical CVEs this week", "CVSS 9 and up", ""),
-    tile("#menu", stats.ransomware30 ?? "–", "exploited CVEs used by ransomware", "last 30 days", stats.ransomware30 ? "warn" : ""),
-    tile("#malware", rw ? fmtNum(rw.total7) : "–", "ransomware leak-site posts this week", grp ? `busiest: ${grp[0]}` : "", ""),
-    tile("#menu", days === null ? "–" : days, "days since an exploited edge device", days === 0 ? "it happened today" : days !== null && days < 7 ? "don't lean on the VPN box" : "", days === 0 ? "hot" : ""),
-    tile("#shift", ptd <= 0 ? "today" : ptd, ptd <= 0 ? "Patch Tuesday is today" : `day${ptd === 1 ? "" : "s"} to Patch Tuesday`, pt.toLocaleDateString(undefined, { day: "numeric", month: "short" }), ptd <= 1 ? "warn" : ""));
+  $("#today").textContent = d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }) + (st.on ? ` · ${Math.max(0, Math.round((st.e - d) / 36e5 * 10) / 10)} h left on shift` : "");
 }
 
-// ---------- patch first ----------
-function patchFirst() {
-  const score = (c) => (c.ransomware ? 40 : 0) + (isEdge(c) ? 30 : 0) + (c.epss || 0) * 30 + Math.max(0, 30 - (Date.now() - Date.parse(c.date || 0)) / 864e5);
-  const top = cves.filter((c) => c.kev && !c.snapshot).sort((a, b) => score(b) - score(a)).slice(0, 6);
-  put($("#pfList"), top.length ? top.map((c) => { const [st, cls] = status(c); return h("li", h("button.pf-i", { type: "button", onclick: () => detail(c) },
-    h("span.pf-top", h("b", [c.vendor, c.product].filter(Boolean).join(" ")), h("span.pill.stp." + cls, st)),
-    h("span.muted.small", [c.id, isEdge(c) ? "edge device" : "", c.epss != null ? `EPSS ${(c.epss * 100).toFixed(c.epss < 0.1 ? 1 : 0)}%` : "", c.date ? `added ${ago(c.date + "T12:00:00Z")}` : ""].filter(Boolean).join(" · ")))); })
-    : [h("li.muted", "Live data is on its way.")]);
-}
-
-// ---------- charts ----------
-function tipAt(el, text) {
-  const t = $("#ctip"); const box = t.parentElement.getBoundingClientRect(); const r = el.getBoundingClientRect();
-  t.textContent = text; t.hidden = false;
-  t.style.left = Math.max(4, Math.min(box.width - 200, r.left - box.left + r.width / 2 - 60)) + "px"; t.style.top = (r.top - box.top - 34) + "px";
-}
-const hideTip = () => { const t = $("#ctip"); if (t) t.hidden = true; };
-function perDay(c) {
-  const box = $("#perDay"); const days = [];
-  for (let i = 29; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5); days.push(d.toISOString().slice(0, 10)); }
-  const by = {}; for (const k of c?.kev || []) by[k.added] = (by[k.added] || []).concat(k);
-  const vals = days.map((d) => (by[d] || []).length); const max = Math.max(1, ...vals); const total = vals.reduce((a, b) => a + b, 0);
-  $("#perDaySub").textContent = c ? `${total} in 30 days · busiest day ${max}` : "";
-  box.setAttribute("aria-label", `Exploited CVEs added to CISA KEV per day for the last 30 days. ${total} in total, at most ${max} on one day.`);
-  put(box, days.map((d, i) => {
-    const v = vals[i]; const list = by[d] || [];
-    const b = h("button.vb" + (v ? "" : ".zero") + (i === 29 ? ".today" : ""), { type: "button", "aria-label": `${d}: ${v}` });
-    const fill = h("span.vb-f"); fill.style.height = (v ? Math.max(6, (v / max) * 100) : 0) + "%"; b.append(fill);
-    const label = `${new Date(d + "T12:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short" })}: ${v} added${list.length ? " · " + list.slice(0, 2).map((x) => `${x.vendor} ${x.product}`.trim()).join(", ") + (list.length > 2 ? "…" : "") : ""}`;
-    b.addEventListener("pointerenter", () => tipAt(b, label)); b.addEventListener("focus", () => tipAt(b, label));
-    b.addEventListener("pointerleave", hideTip); b.addEventListener("blur", hideTip);
-    b.addEventListener("click", () => { if (list.length) listModal(`Added to KEV on ${d}`, list.map((k) => cves.find((x) => x.id === k.id)).filter(Boolean)); });
+// ---------- threat map ----------
+const LAYERS = [["attacks", "Attack traffic"], ["ransom", "Ransomware victims"], ["c2", "Botnet C2"]];
+let layerOn = { attacks: true, ransom: true, c2: true };
+function el(tag, attrs = {}) { const e = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; }
+function map() {
+  const wrap = $("#mapWrap"); if (!wrap || !world) return;
+  const { W, H, PATHS, CENTROIDS, NAMES } = world;
+  const tip = $("#mapTip");
+  wrap.querySelector("svg")?.remove();
+  const victims = Object.fromEntries((rw?.countries30 || []).map(([k, v]) => [k.toUpperCase(), v]));
+  const c2 = Object.fromEntries((tm?.c2?.countries || []).map(([k, v]) => [k, v]));
+  const pairs = tm?.radar?.pairs || [];
+  const tgtPct = Object.fromEntries((tm?.radar?.targets || []).map(([k, v]) => [k, v]));
+  const orgPct = Object.fromEntries((tm?.radar?.origins || []).map(([k, v]) => [k, v]));
+  const vmax = Math.max(1, ...Object.values(victims)); const cmax = Math.max(1, ...Object.values(c2));
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, class: "worldmap", role: "img", "aria-label": "World map of ransomware victims, botnet command servers and attack traffic" });
+  const defs = el("defs");
+  const grad = (tag, id, attrs, stops) => { const g = el(tag, { id, ...attrs }); for (const [o, c, op] of stops) g.append(el("stop", { offset: o, "stop-color": c, "stop-opacity": op })); defs.append(g); };
+  grad("linearGradient", "sweepG", { x1: 0, x2: 1 }, [[0, "#5CE1C6", 0], [0.8, "#5CE1C6", 0.05], [0.985, "#5CE1C6", 0.35], [1, "#5CE1C6", 0]]);
+  svg.append(defs);
+  // graticule for a little depth
+  const grat = el("g", { class: "grat" });
+  for (let x = 0; x <= W; x += 50) grat.append(el("line", { x1: x, y1: 0, x2: x, y2: H }));
+  for (let y = 0; y <= H; y += 50) grat.append(el("line", { x1: 0, y1: y, x2: W, y2: y }));
+  svg.append(grat);
+  const land = el("g", { class: "land" });
+  for (const [cc, d] of Object.entries(PATHS)) {
+    const p = el("path", { d, "data-cc": cc });
+    const v = victims[cc] || 0;
+    if (layerOn.ransom && v) { const k = Math.pow(v / vmax, 0.55); p.style.fill = `color-mix(in srgb, #A78BFA ${Math.round(18 + k * 70)}%, #18213D)`; p.classList.add("hot"); }
+    land.append(p);
+  }
+  svg.append(land);
+  // C2 pulses
+  const pulses = el("g", { class: "pulses" });
+  if (layerOn.c2) for (const [cc, n] of Object.entries(c2)) {
+    const pt = CENTROIDS[cc]; if (!pt) continue;
+    const r = 2.5 + Math.sqrt(n / cmax) * 7; const rnd = mulberry32(seedFrom(cc));
+    const g = el("g", { class: "pulse", transform: `translate(${pt[0]} ${pt[1]})` });
+    const ring = el("circle", { r, class: "ring" }); ring.style.animationDelay = `${(rnd() * 3).toFixed(2)}s`;
+    g.append(ring, el("circle", { r: Math.max(2, r * 0.45), class: "core" }));
+    pulses.append(g);
+  }
+  svg.append(pulses);
+  // attack arcs (Cloudflare Radar origin -> target)
+  const arcs = el("g", { class: "arcs" });
+  if (layerOn.attacks) {
+    const pmax = Math.max(1, ...pairs.map((p) => p[2]));
+    pairs.forEach(([o, t, v], i) => {
+      const a = CENTROIDS[o], b = CENTROIDS[t]; if (!a || !b) return;
+      const w = 0.8 + (v / pmax) * 2.6;
+      if (o === t) { const c = el("circle", { cx: a[0], cy: a[1], r: 6 + w * 3, class: "selfhit" }); c.style.animationDelay = `${(i * 0.4) % 4}s`; arcs.append(c); return; }
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dist = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const d = `M${a[0]} ${a[1]} Q${mx} ${my - Math.min(160, dist * 0.45)} ${b[0]} ${b[1]}`;
+      arcs.append(el("path", { d, class: "arc-base", "stroke-width": w }));
+      const comet = el("path", { d, class: "arc-comet", "stroke-width": w + 0.8, pathLength: 100 });
+      comet.style.animationDelay = `${(i * 0.37) % 3.2}s`; comet.style.animationDuration = `${2.4 + (i % 4) * 0.35}s`;
+      arcs.append(comet, el("circle", { cx: b[0], cy: b[1], r: 2.2 + w * 0.6, class: "arc-hit" }));
+    });
+  }
+  svg.append(arcs);
+  const sweep = el("rect", { x: -90, y: 0, width: 90, height: H, fill: "url(#sweepG)", class: "sweep" });
+  svg.append(sweep);
+  wrap.prepend(svg);
+  // hover tooltips
+  const SHORTN = { US: "United States", GB: "United Kingdom", RU: "Russia", KR: "South Korea", KP: "North Korea", IR: "Iran", VN: "Vietnam", CD: "DR Congo", CZ: "Czechia", BA: "Bosnia", DO: "Dominican Rep.", AE: "UAE" };
+  const name = (cc) => SHORTN[cc] || NAMES[cc] || cc;
+  land.addEventListener("pointermove", (e) => {
+    const cc = e.target.dataset?.cc; if (!cc) { tip.hidden = true; return; }
+    const bits = [];
+    if (victims[cc]) bits.push(`${victims[cc]} ransomware victims (30 days)`);
+    if (c2[cc]) bits.push(`${c2[cc]} botnet C2 servers`);
+    if (tgtPct[cc]) bits.push(`${tgtPct[cc]}% of attack traffic targets it`);
+    if (orgPct[cc]) bits.push(`${orgPct[cc]}% of attack traffic comes from it`);
+    tip.textContent = ""; tip.append(h("b", name(cc)), ...(bits.length ? bits.map((x) => h("span", x)) : [h("span.muted", "nothing notable")]));
+    const r = wrap.getBoundingClientRect(); tip.hidden = false;
+    tip.style.left = Math.min(r.width - 230, Math.max(6, e.clientX - r.left + 14)) + "px"; tip.style.top = Math.max(6, e.clientY - r.top - 10) + "px";
+  });
+  land.addEventListener("pointerleave", () => { tip.hidden = true; });
+  // layer chips
+  put($("#layers"), LAYERS.map(([k, l]) => {
+    const has = k === "attacks" ? pairs.length : k === "ransom" ? Object.keys(victims).length : Object.keys(c2).length;
+    const b = h("button.lchip.l-" + k + (layerOn[k] ? ".on" : ""), { type: "button", "aria-pressed": String(layerOn[k]), disabled: !has, title: has ? "" : "No data yet" }, h("i"), l);
+    b.addEventListener("click", () => { layerOn[k] = !layerOn[k]; map(); });
     return b;
   }));
-  const fmt = (d) => new Date(d + "T12:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short" });
-  put($("#perDayAxis"), h("span", fmt(days[0])), h("span", fmt(days[15])), h("span", "today"));
-}
-const SECTORS = [
-  ["Edge & network", /router|firewall|vpn|gateway|switch|load balanc|fortinet|fortios|fortigate|ivanti|connect secure|citrix|netscaler|palo alto|pan-os|sonicwall|cisco|juniper|\bf5\b|big-ip|zyxel|d-link|tp-link|netgear|draytek|ubiquiti|mikrotik|check point|\bnas\b|qnap|synology/],
-  ["OS & browsers", /windows|win32k|kernel|linux|macos|\bios\b|ipados|android|chrome|chromium|firefox|safari|webkit|apple|samsung|\bsmb\b|ntlm|kerberos|pixel/],
-  ["Servers & business apps", /exchange|sharepoint|oracle|\bsap\b|netweaver|vmware|vcenter|esxi|veeam|confluence|jira|atlassian|servicenow|sql server|weblogic|tomcat|moveit|goanywhere|papercut|backup|\berp\b|crm|commvault|solarwinds|manageengine|zoho|trimble|cityworks|kaseya|connectwise|screenconnect/],
-  ["AI & dev tools", /\bai\b|\bllm|langchain|langflow|ollama|vllm|\bmcp\b|comfyui|gradio|jupyter|hugging ?face|openai|copilot|litellm|open webui|n8n|\bnpm\b|pypi|node\.js|github|gitlab|jenkins|teamcity|docker|kubernetes|terraform|\bgit\b/],
-  ["Web & CMS", /wordpress|wp plugin|plugin|drupal|joomla|magento|craft cms|\bphp\b|\bcms\b|web application|cross-site|\bxss\b|laravel|struts|spring/],
-  ["Everything else", /.*/],
-];
-
-function sectorOf(c) {
-  if (isEdge(c)) return 0;
-  const who = `${c.vendor} ${c.product}`.toLowerCase(); const all = `${who} ${c.title} ${c.desc}`.toLowerCase();
-  const i = SECTORS.findIndex(([, rx], k) => k < 5 && rx.test(who)); // vendor/product first, it's the most reliable
-  return i >= 0 ? i : SECTORS.findIndex(([, rx]) => rx.test(all));
+  // side lists
+  const rows = (pairsIn, fmt) => pairsIn.slice(0, 5).map(([cc, v]) => { const max = pairsIn[0][1] || 1; const f = h("i"); f.style.width = Math.max(4, (v / max) * 100) + "%"; return h("li", h("span", name(cc)), h("span.mbar", f), h("b", fmt(v))); });
+  const side = [];
+  if (tm?.radar?.targets?.length) side.push(h("div.ms", h("h4", "Most attacked"), h("ol", rows(tm.radar.targets, (v) => v + "%"))));
+  if (tm?.radar?.origins?.length) side.push(h("div.ms", h("h4", "Attacks come from"), h("ol", rows(tm.radar.origins, (v) => v + "%"))));
+  if (!side.length && rw?.countries30?.length) side.push(h("div.ms", h("h4", "Most ransomware victims"), h("ol", rows(rw.countries30.map(([k, v]) => [k.toUpperCase(), v]), (v) => v))));
+  if (tm?.c2?.countries?.length) side.push(h("div.ms", h("h4", "Botnet C2 hosted in"), h("ol", rows(tm.c2.countries, (v) => v))));
+  put($("#mapSide"), side.length ? side : [h("p.muted.small", "Live layers appear after the next data refresh.")]);
+  const src = [pairs.length ? "Cloudflare Radar (application-layer attacks, last 24 h)" : "", Object.keys(victims).length ? "ransomware.live (leak-site claims, 30 days)" : "", Object.keys(c2).length ? "abuse.ch Feodo Tracker" : ""].filter(Boolean);
+  $("#mapSrc").textContent = src.length ? "Sources: " + src.join(" · ") + (tm?.generated ? ` · updated ${ago(tm.generated)}` : "") : "";
 }
 
-function areas() {
-  const recent = cves.filter((c) => !c.snapshot && c.date && Date.now() - Date.parse(c.date) < 30.5 * 864e5);
-  const groups = SECTORS.map(([n]) => ({ n, items: [] })); for (const c of recent) groups[sectorOf(c)].items.push(c);
-  const rows = groups.filter((g) => g.items.length).sort((a, b) => b.items.length - a.items.length);
-  const max = Math.max(1, ...rows.map((g) => g.items.length));
-  put($("#areas"), rows.length ? rows.map((g) => {
-    const kev = g.items.filter((c) => c.kev).length;
-    const fill = h("span.bar-fill"); fill.style.width = Math.max(4, (g.items.length / max) * 100) + "%";
-    return h("li", h("button.bar-k.bar-btn", { type: "button", onclick: () => listModal(g.n, g.items) }, g.n), h("span.bar", fill), h("span.bar-v", { title: `${kev} exploited` }, String(g.items.length)));
-  }) : [h("li.muted", "No recent CVEs yet.")]);
+// ---------- KPI tiles with sparklines ----------
+function spark(values, cls) {
+  const w = 120, hh = 34, max = Math.max(1, ...values), n = values.length;
+  const pts = values.map((v, i) => [((i / Math.max(1, n - 1)) * w).toFixed(1), (hh - 2 - (v / max) * (hh - 6)).toFixed(1)]);
+  const svg = el("svg", { viewBox: `0 0 ${w} ${hh}`, class: "ksp " + cls, preserveAspectRatio: "none", "aria-hidden": "true" });
+  svg.append(el("path", { d: `M0 ${hh} L${pts.map((p) => p.join(" ")).join(" L")} L${w} ${hh}Z`, class: "sp-area" }), el("path", { d: `M${pts.map((p) => p.join(" ")).join(" L")}`, class: "sp-line", pathLength: 100 }));
+  return svg;
 }
-function listModal(title, items) {
-  modal([h("h2", title), h("ul.aicve", items.sort((a, b) => b.heat - a.heat).slice(0, 30).map((c) => { const [st, cls] = status(c);
-    return h("li", h("button.rt", { type: "button", onclick: () => detail(c) }, h("span.rt-id", c.id), h("span.rt-p", productName(c)), h("span.pill.stp." + cls, st))); }))], { label: title });
+function countTo(node, to) {
+  const t0 = performance.now(), ms = 900;
+  const step = (t) => { const k = Math.min(1, (t - t0) / ms); node.textContent = fmtNum(Math.round(to * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function tiles() {
+  const days = []; for (let i = 29; i >= 0; i--) days.push(new Date(Date.now() - i * 864e5).toISOString().slice(0, 10));
+  const by = {}; for (const k of cvesRaw?.kev || []) by[k.added] = (by[k.added] || 0) + 1;
+  const kevDaily = days.map((d) => by[d] || 0);
+  const pt = nextPatchTuesday(new Date()); const ptd = Math.max(0, Math.ceil((pt - new Date()) / 864e5));
+  const top = tm?.ports?.[0];
+  const T = [];
+  const tile = (href, n, label, extra, tone) => {
+    const num = h("span.kn", "0"); const a = h("a.kt" + (tone ? "." + tone : ""), { href }, h("span.kl", label), num, extra || null);
+    if (typeof n === "number") countTo(num, n); else num.textContent = n;
+    return a;
+  };
+  T.push(tile("#menu", stats.kevAdded7 ?? 0, "Exploited CVEs this week", spark(kevDaily, "sp-red"), stats.kevAdded7 >= 5 ? "hot" : ""));
+  if (rw?.daily?.length) T.push(tile("#malware", rw.total7 || 0, "Ransomware posts this week", spark(rw.daily.map((d) => d[1]), "sp-violet")));
+  if (tm?.c2) T.push(tile("#malware", tm.c2.online, "Botnet C2 servers online", h("span.ks", `${fmtNum(tm.c2.total)} tracked`)));
+  if (top) T.push(tile("#lounge", `${top[0]}`, "Most-scanned port today", h("span.ks", PORTS[top[0]] || "")));
+  T.push(tile("#shift", ptd, "Days to Patch Tuesday", h("span.ks", pt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), ptd <= 1 ? "warn" : ""));
+  put($("#ktiles"), T);
 }
 
-// ---------- lists ----------
-function headlines() {
-  const items = (news?.security || []).slice(0, 8);
-  put($("#headlines"), items.length ? items.map((n) => h("li", ext(n.u, n.t), h("span.hm", `${n.s} · ${ago(n.d)}`))) : [h("li.muted", "Headlines appear after the first data refresh.")]);
-  const ai = [...(news?.ai || []).slice(0, 2).map((n) => h("li", ext(n.u, n.t), h("span.hm", `${n.s} · ${ago(n.d)}`))),
-    ...(news?.mcp || []).slice(0, 2).map((m) => h("li", m.u ? ext(m.u, m.t.split("/").pop()) : m.t, h("span.hm", `New MCP server · ${ago(m.d)}`)))];
-  put($("#aiMini"), ai.length ? ai : [h("li.muted", "Nothing yet.")]);
+// ---------- panels ----------
+function patchFirst() {
+  const score = (c) => (c.ransomware ? 40 : 0) + (isEdge(c) ? 30 : 0) + (c.epss || 0) * 30 + Math.max(0, 30 - (Date.now() - Date.parse(c.date || 0)) / 864e5);
+  const top = cves.filter((c) => c.kev && !c.snapshot).sort((a, b) => score(b) - score(a)).slice(0, 5);
+  put($("#pfList"), top.length ? top.map((c) => { const [st, cls] = status(c); return h("li", h("button.pf-i", { type: "button", onclick: () => detail(c) },
+    h("span.pf-top", h("b", productName(c)), h("span.pill.stp." + cls, st)), h("span.muted.small", c.id + (c.date ? ` · ${ago(c.date + "T12:00:00Z")}` : "")))); })
+    : [h("li.muted", "Live data is on its way.")]);
+}
+function barsInto(box, items, cls) {
+  const max = Math.max(1, ...items.map((x) => x[1]));
+  put(box, items.map(([k, v, sub], i) => { const f = h("span.bar-fill" + (cls ? "." + cls : "")); f.style.setProperty("--w", Math.max(4, (v / max) * 100) + "%"); f.style.animationDelay = `${i * 70}ms`;
+    return h("li", h("span.bar-k", k, sub ? h("small", sub) : null), h("span.bar", f), h("span.bar-v", fmtNum(v))); }));
+}
+function ports() {
+  const p = tm?.ports || [];
+  $("#portSrc").textContent = p.length ? "SANS ISC, today" : "";
+  if (!p.length) { put($("#ports"), h("li.muted", "Appears after the next data refresh.")); return; }
+  barsInto($("#ports"), p.slice(0, 6).map(([port, rec]) => [String(port), rec, PORTS[port] || ""]), "pt");
 }
 function rwMini() {
-  const box = $("#rwMini"); const g = rw?.groups7?.length ? rw.groups7 : rw?.groups30 || [];
-  if (!g.length) { put(box, h("li.muted", "Ransomware activity appears after the first data refresh.")); $("#rwNote").textContent = ""; return; }
-  const max = Math.max(1, ...g.map((x) => x[1]));
-  put(box, g.slice(0, 5).map(([k, v]) => { const f = h("span.bar-fill.rwf"); f.style.width = Math.max(4, (v / max) * 100) + "%"; return h("li", h("span.bar-k", k), h("span.bar", f), h("span.bar-v", String(v))); }));
-  const sec = rw.sectors30?.[0]; $("#rwNote").textContent = sec ? `Most-hit sector this month: ${sec[0]}. Claims from leak sites, counts only.` : "";
-}
-function partner() {
-  const b = buddyInfo(); if (!b) return;
-  $("#partnerName").textContent = b.n; $("#partnerDesc").textContent = b.d;
-}
-
-// ---------- ten-second brief ----------
-function brief() {
-  const ul = $("#miniBrew"); const items = [];
-  const top = cves.find((c) => c.kev);
-  if (stats.kevAdded7 !== undefined) items.push(h("li", h("b", `${stats.kevAdded7} new exploited CVEs this week.`), top ? ` Newest: ${top.id} in ${productName(top)}.` : ""));
-  const fam = mal ? Object.entries(mal.families).sort((a, b) => (b[1].mentions || 0) + (b[1].iocs7 || 0) - (a[1].mentions || 0) - (a[1].iocs7 || 0))[0] : null;
-  if (fam && (fam[1].mentions || fam[1].iocs7)) items.push(h("li", "Malware in the news: ", h("a.link", { href: "#malware" }, fam[0].split(".")[1].replace(/_/g, " ")), "."));
-  const s = news?.soc?.[0]; if (s) items.push(h("li", h("span.muted", "From SOC teams: "), ext(s.u, s.t)));
-  put(ul, items.length ? items : [h("li.muted", "Live data is on its way. The first refresh runs a few minutes after deploy.")]);
+  const g = rw?.groups7?.length ? rw.groups7 : rw?.groups30 || [];
+  if (!g.length) { put($("#rwMini"), h("li.muted", "Appears after the next data refresh.")); return; }
+  barsInto($("#rwMini"), g.slice(0, 6), "rwf");
 }
 
 // ---------- split-flap board ----------
@@ -241,23 +274,6 @@ function board(animate) {
 }
 
 
-function lookup(raw) {
-  const out = $("#tiOut"); const ind = classify(raw);
-  if (ind.type === "empty") { out.textContent = ""; return; }
-  const notes = [];
-  if (ind.type === "unknown") { put(out, h("p.muted", "That doesn't look like an IP, domain, URL, hash, email, CVE or technique ID. Try the IOC extractor in Shift buddy for messy text.")); return; }
-  if (ind.private) notes.push(h("p.note", "This is a private or reserved address. Public threat intel won't know it: check your own DHCP, CMDB and EDR instead."));
-  if (ind.type === "cve") {
-    const c = cves.find((x) => x.id === ind.value);
-    notes.push(c ? h("p.note.ok", "In today's feed: ", h("button.linkbtn", { type: "button", onclick: () => detail(c) }, `${c.id}, ${productName(c)}, ${status(c)[0]}`)) : h("p.note", "Not in our current feed (we track recent KEV and critical CVEs). The links below have the full story."));
-  }
-  if (["sha256", "sha1", "md5"].includes(ind.type)) notes.push(h("p.note", "Look up hashes, don't upload files. Uploading a company document to a public sandbox makes it public."));
-  if (ind.type === "url" || ind.type === "domain") notes.push(h("p.note", "Don't open it in your normal browser. Use urlscan or a sandbox. Safe to share as: ", h("code", defang(ind.value))));
-  put(out, h("p.lk-type", h("b", TYPE_NAME[ind.type]), " ", h("code", ind.value), h("button.btn.ghost.sm", { type: "button", onclick: () => { copyText(ind.value); toast("Copied"); } }, "Copy")),
-    notes, h("ul.pivots", pivots(ind).map(([l, u, why]) => h("li", ext(u, l), h("span.muted", why)))),
-    h("p.muted.small", "Nothing is sent anywhere until you click a link. Each one opens in a new tab with no referrer."));
-}
-
 function ticker() {
   const tr = $("#ticker"); const heads = (news?.security || []).slice(0, 14);
   if (!heads.length) { tr.textContent = "Pager quiet. Suspiciously quiet."; return; }
@@ -288,29 +304,4 @@ function scroll(tr) {
 }
 
 
-// ---------- horoscope ----------
-function horoscope() {
-  const p = profile(); const pool = HORO[p.role] || HORO["L1 analyst"];
-  $("#horoRole").textContent = p.role;
-  $("#horo").textContent = pickDay(pool, seedFrom(p.role) % 97);
-  const r = mulberry32(seedFrom(todayKey() + p.role));
-  $("#lucky").textContent = `Lucky port ${pick([22, 53, 443, 445, 3389, 8080, 5985, 1337, 4444, 31337], r)} · lucky event ID ${pick([4624, 4688, 4720, 4769, 7045, 1102, 4104, 4625], r)} · avoid ${pick(["change freezes", "Friday deploys", "the CISO's calendar", "reply-all", "the printer", "untested backups"], r)}`;
-}
 
-// ---------- quests ----------
-function questsUI() {
-  const box = $("#quests"); if (!box) return;
-  put(box, quests().map((q) => h("a.quest" + (q.done ? ".done" : ""), { href: q.go },
-    h("span.qbox", q.done ? icon("check") : ""), h("span.qt", q.t), h("span.qn.muted", `${q.have}/${q.n}`))));
-}
-
-// ---------- mood ----------
-function moodsUI() {
-  const box = $("#moods"); const cur = todayMood();
-  put(box, MOODS.map((m, i) => h("button.moodb" + (cur === i ? ".on" : ""), { "aria-pressed": String(cur === i), onclick: () => {
-    const first = todayMood() === null; setMood(i); moodsUI(); sfx("pop");
-    $("#moodReply").textContent = MOOD_REPLY[i] || "";
-    if (first) { earn(3, "mood"); xp(5, "mood"); }
-  } }, h("span.mface.m" + i), h("span", m[1]))));
-  if (cur !== null) $("#moodReply").textContent = MOOD_REPLY[cur] || "";
-}

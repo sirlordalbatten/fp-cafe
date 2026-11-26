@@ -100,9 +100,9 @@ function audit() {
   const report = () => copyText(["SURFACE AUDIT", new Date().toLocaleDateString(), "", ...items().map((x) => `[${verdict(x)[0]}] ${x.n} (${x.k}${x.net ? ", internet-facing" : ""}). Who: ${x.who || "nobody named"}. Gain: ${x.gain || "-"}.`), "", sum.textContent].join("\n"), "Audit copied");
   put(box,
     h("div.panel", h("div.ph", h("h3", "Where an agent would look first"), h("span.muted.small", "links open public sources in a new tab")),
-      h("p.small", "AI-driven attackers can afford a patient look at everyone, including your history. Enter your domain and walk the list. Tick what you've reviewed. Saved in this browser only."),
+      h("p.small", "Enter your domain and walk the list. Tick what you've reviewed. Saved in this browser only."),
       h("div.lk-row", domIn), placeBox,
-      h("p.muted.small", "Based on ", ext("https://cyb3rops.medium.com/the-age-of-defensive-minimalism-b882c2c7144c", "Florian Roth, The Age of Defensive Minimalism"), ". Only look at domains you're responsible for.")),
+      h("p.muted.small", "Inspired by Florian Roth's idea of defensive minimalism. Only look at domains you're responsible for.")),
     h("div.panel", h("div.ph", h("h3", "Would we build it again?"), h("span.muted.small", "keep, narrow or remove")),
       h("p.small", "For everything you expose: who needs it, what do they gain, and could they work without it? Anything nobody can justify is attack surface with no upside."),
       h("div.audit-form", f.n, f.k, h("label.chk", f.net, h("span", "Reachable from the internet")), f.who, f.gain, f.without, h("button.btn.primary", { type: "button", onclick: add }, "Add to the audit")),

@@ -96,7 +96,7 @@ const QUESTS = [
 export function quests() {
   const r = mulberry32(seedFrom("quests" + todayKey()));
   const picks = shuffle(QUESTS, r).filter((q, i, a) => a.findIndex((x) => x.stat === q.stat) === i).slice(0, 3);
-  picks.unshift({ id: "mood", t: "Check in: how are you, really?", stat: "_mood", n: 1, go: "#lounge" });
+  picks.unshift({ id: "mood", t: "Check in: how are you, really?", stat: "_mood", n: 1, go: "#me" });
   const d = today(); const done = arr(store.get("questsPaid_" + todayKey(), []));
   return picks.map((q) => {
     const have = q.stat === "_mood" ? (todayMood() === null ? 0 : 1) : num(d[q.stat], 0);

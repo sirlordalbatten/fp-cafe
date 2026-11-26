@@ -26,7 +26,13 @@ export function drawBuddy(el = $("#buddy")) {
   el.setAttribute("aria-label", `Pet ${buddyInfo().n}`);
 }
 
-export function say(text, el = $("#say")) { if (el) typeText(el, text); }
+let talkT = 0;
+export function say(text, el = $("#say")) {
+  if (!el) return; typeText(el, text);
+  const b = $("#buddy"); if (!b || !text) return;
+  b.classList.add("talking", "typing"); clearTimeout(talkT);
+  talkT = setTimeout(() => b.classList.remove("talking", "typing"), Math.min(4200, 600 + text.length * 32));
+}
 
 export function chatter() {
   const p = profile(); const night = document.body.classList.contains("night");
@@ -50,8 +56,8 @@ export function initBuddy() {
   drawBuddy(el);
   el.addEventListener("click", () => {
     const now = Date.now(); clicks = clicks.filter((t) => now - t < 2500); clicks.push(now); sfx("pop");
-    if (clicks.length >= 5) { clicks = []; react("spin", "Okay, okay, I'm awake. Want to play something? The arcade has new games."); }
-    else react("jump", clicks.length === 1 ? pick(["Hehe. That tickles.", "Pats received. Morale +1.", "You're my favourite analyst.", "Again! No, wait, the queue."]) : "");
+    if (clicks.length >= 5) { clicks = []; react("spin", "Alright, I'm listening. Want to run a drill from the Lounge?"); }
+    else react("jump", clicks.length === 1 ? pick(["Need a second pair of eyes?", "On it.", "Queue's moving. Keep going.", "Shout if something looks off.", "Coffee after this one."]) : "");
   });
   window.addEventListener("pointermove", (e) => {
     if (RM) return; const pu = el.querySelector(".m-pupils"); if (!pu) return;
@@ -60,8 +66,8 @@ export function initBuddy() {
     pu.style.transform = `translate(${((dx / d) * 2.6 * k).toFixed(2)}px,${((dy / d) * 2.2 * k).toFixed(2)}px)`;
   }, { passive: true });
 
-  on("levelup", (l) => react("spin", `Level up! You're a ${l.title} now. I'm telling everyone.`));
-  on("game:end", (g) => g.best ? react("spin", `New personal best in ${g.label}: ${g.score}. Frame it.`) : null);
+  on("levelup", (l) => react("spin", `Level up: ${l.title}. Nice work.`));
+  on("game:end", (g) => g.best ? react("spin", `Personal best in ${g.label}: ${g.score}.`) : null);
   on("ciso", (c) => c.angry && say("Psst. The CISO is walking over. Look busy. Or helpful. Ideally helpful."));
   on("inv", () => drawBuddy());
   on("profile", () => drawBuddy());

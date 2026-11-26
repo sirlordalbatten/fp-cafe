@@ -297,3 +297,61 @@ class NewSources(unittest.TestCase):
         self.assertIsNone(items[0]["u"])
         self.assertNotIn("<b>", items[1]["x"])
         R.validate("news", {"generated": "x", "security": [], "ai": [], "soc": [], "mcp": items})
+
+
+class ThreatMapAndCerts(unittest.TestCase):
+    def _fake(self, url, **kw):
+        if "feodotracker" in url:
+            return json.dumps([{"ip_address": "1.2.3.4", "country": "US", "malware": "QakBot", "status": "online"},
+                               {"ip_address": "5.6.7.8", "country": "de", "malware": "Emotet", "status": "offline"},
+                               {"ip_address": "9.9.9.9", "country": "<b>", "malware": "<script>", "status": "online"}]).encode()
+        if "topports" in url:
+            return json.dumps({"0": {"rank": 1, "targetport": 23, "records": 900, "targets": 50, "sources": 40},
+                               "1": {"rank": 2, "targetport": "445", "records": "1200", "targets": 60, "sources": 30}, "date": "2026-11-26"}).encode()
+        if "infocon" in url:
+            return json.dumps({"status": "green"}).encode()
+        if "top/attacks" in url:
+            return json.dumps({"result": {"top_0": [{"originCountryAlpha2": "US", "targetCountryAlpha2": "SG", "value": "12.5"},
+                                                    {"originCountryAlpha2": "x<", "targetCountryAlpha2": "SG", "value": "1"}]}}).encode()
+        if "locations/origin" in url:
+            return json.dumps({"result": {"top_0": [{"originCountryAlpha2": "US", "value": "30.1"}]}}).encode()
+        if "locations/target" in url:
+            return json.dumps({"result": {"top_0": [{"targetCountryAlpha2": "SG", "value": "9.9"}]}}).encode()
+        raise IOError("unexpected " + url)
+
+    def test_threatmap_counts_only_and_sanitised(self):
+        with mock.patch.object(R, "http_get", side_effect=self._fake), mock.patch.dict(os.environ, {"CLOUDFLARE_RADAR_TOKEN": "t"}):
+            d = R.build_threatmap({})
+        R.validate("threatmap", d)
+        blob = json.dumps(d)
+        self.assertNotIn("1.2.3.4", blob)
+        self.assertNotIn("<script>", blob)
+        self.assertEqual(d["c2"]["online"], 2)
+        self.assertEqual(d["ports"][0][0], 445)
+        self.assertEqual(d["radar"]["pairs"], [["US", "SG", 12.5]])
+        self.assertEqual(d["infocon"], "green")
+
+    def test_threatmap_failure_keeps_previous_and_no_token_skips_radar(self):
+        prev = {"generated": "x", "c2": {"total": 1, "online": 1, "countries": [["US", 1]], "malware": []}, "ports": [[22, 5, 1, 1]], "infocon": "yellow"}
+        env = {k: v for k, v in os.environ.items() if k != "CLOUDFLARE_RADAR_TOKEN"}
+        with mock.patch.object(R, "http_get", side_effect=IOError("down")), mock.patch.object(R.time, "sleep"), mock.patch.dict(os.environ, env, clear=True):
+            d = R.build_threatmap(prev)
+        self.assertEqual(d["status"]["Feodo Tracker"], "stale")
+        self.assertEqual(d["ports"], [[22, 5, 1, 1]])
+        self.assertNotIn("radar", d)
+        R.validate("threatmap", d)
+
+    def test_certs_from_yaml_with_link_check(self):
+        news = [{"t": "OffSec updates the OSCP exam", "u": "https://example.com/a", "s": "X", "d": "2026-11-20T00:00:00Z", "x": "", "g": []},
+                {"t": "Unrelated story", "u": "https://example.com/b", "s": "X", "d": "2026-11-20T00:00:00Z", "x": "", "g": []}]
+        with mock.patch.object(R, "link_ok", side_effect=lambda u: "comptia" not in u):
+            d = R.build_certs({}, news)
+        R.validate("certs", d)
+        self.assertGreater(len(d["certs"]), 15)
+        sec = next(c for c in d["certs"] if c["id"] == "secplus")
+        self.assertFalse(sec["ok"])
+        self.assertEqual(sec["u"], "https://www.comptia.org/")
+        self.assertEqual([n["t"] for n in d["news"]], ["OffSec updates the OSCP exam"])
+        with mock.patch.object(R, "link_ok", side_effect=AssertionError("should not recheck within a week")):
+            d2 = R.build_certs(d, [])
+        self.assertEqual(d2["checked"], d["checked"])

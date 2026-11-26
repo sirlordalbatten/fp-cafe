@@ -37,12 +37,3 @@ export const QUESTIONS = [
   "Can it show its evidence for every verdict?",
   "What happens when it's wrong, and how would we know?",
 ];
-
-// Short, paraphrased takeaways for defenders. Source linked in the panel.
-export const AGENTIC = [
-  ["Being unique no longer hides you", "Custom apps and internal tools were safe in practice because studying them didn't pay. An agent only needs a few hours of compute."],
-  ["Your history is attack surface", "Old commits, build logs, archived web pages and job adverts were written for a world where nobody read all of it. Agents do."],
-  ["Rare isn't a reason to wait", "Priorities built on what attackers used to bother with assume the old distribution of attention. A low finding matters if it connects to something valuable."],
-  ["The scan looks the same. What follows doesn't", "An agent's first step looks like background noise. Watch for the follow-up: docs read, old endpoints tried, odd responses revisited."],
-  ["Speed of decision is the new gap", "Detection is fast. Deciding whether containment breaks production is slow, and the agent uses that time. Agree in advance what can be contained at once."],
-];

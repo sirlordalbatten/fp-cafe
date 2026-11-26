@@ -22,6 +22,10 @@ export async function mount(sec) {
     <div class="stack">
       <div class="panel det-today"><div class="ph"><h3>Detection of the day</h3><a class="link" href="#detect">Detection lab</a></div><div id="detBrew"></div></div>
       <div class="panel"><div class="ph"><h3>Copy for team chat</h3></div><p class="muted small">A plain-text version of this brew to paste into Teams or Slack.</p><button class="btn sm" id="brewCopy"><svg class="ic"><use href="#i-copy"/></svg>Copy the brew</button></div>
+      <div class="panel"><div class="ph"><h3>Patch deadlines</h3><span class="muted small">CISA KEV due dates</span></div><ol class="due" id="dueList"></ol></div>
+      <div class="panel"><div class="ph"><h3>Trending malware</h3><a class="link" href="#malware">Malware bar</a></div><ol class="bars" id="brewMal"></ol></div>
+      <div class="panel"><div class="ph"><h3>Sectors ransomware hit</h3><span class="muted small">last 30 days</span></div><ol class="bars" id="brewSec"></ol></div>
+      <div class="panel"><div class="ph"><h3>From SOC teams</h3><a class="link" href="#playbook">Playbook</a></div><ul class="hl" id="brewSoc"></ul></div>
     </div></div>`);
   const d = new Date();
   $("#brewDate").textContent = d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
@@ -38,6 +42,7 @@ export async function mount(sec) {
   if (hot) items.push(h("li", h("b", `Watch ${hot.id}.`), ` CVSS ${hot.cvss?.toFixed(1)} in ${productName(hot)}, not yet seen exploited. `, h("button.linkbtn", { onclick: () => detail(hot) }, "Details")));
   else if (kev[1]) items.push(h("li", h("b", `Also exploited: ${kev[1].id}`), ` in ${productName(kev[1])}.`));
   put($("#brewItems"), items.length ? items : [h("li", "The live digest appears after the first data refresh. Here's a classic instead: patch your edge devices.")]);
+  sidePanels(list, n);
 
   const s = c?.stats || {};
   const edgeDays = s.lastEdge ? daysSince(s.lastEdge + "T00:00:00Z") : null;
@@ -67,3 +72,21 @@ export async function mount(sec) {
   const dot = $("#brewNew"); if (dot) dot.hidden = true;
 }
 function mdiff(md, now) { if (!md) return 999; const [m, d] = md.split("-").map(Number); let diff = (new Date(now.getFullYear(), m - 1, d) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5; if (diff > 182) diff -= 365; if (diff < -182) diff += 365; return diff; }
+
+// ---------- right-hand live panels ----------
+async function sidePanels(list, n) {
+  const now = Date.now();
+  const due = list.filter((c) => c.kev && c.due && !c.snapshot).map((c) => [c, Math.ceil((Date.parse(c.due + "T23:59:59Z") - now) / 864e5)])
+    .filter(([, d]) => d >= -3 && d <= 10).sort((a, b) => a[1] - b[1]).slice(0, 6);
+  put($("#dueList"), due.length ? due.map(([c, d]) => h("li" + (d < 0 ? ".over" : d <= 2 ? ".soon" : ""), h("button.linkbtn", { type: "button", onclick: () => detail(c) }, productName(c)),
+    h("span.due-d", d < 0 ? `${-d} d overdue` : d === 0 ? "today" : `${d} d`))) : [h("li.muted.small", "No federal deadlines in the next ten days.")]);
+  const bars = (box, pairs) => { const max = Math.max(1, ...pairs.map((p) => p[1]));
+    put(box, pairs.length ? pairs.map(([k, v], i) => { const f = h("span.bar-fill.anim"); f.style.setProperty("--w", Math.max(4, (v / max) * 100) + "%"); f.style.animationDelay = `${i * 70}ms`; return h("li", h("span.bar-k", k), h("span.bar", f), h("span.bar-v", String(v))); })
+      : [h("li.muted.small", "Appears after the next data refresh.")]); };
+  const [m, r] = await Promise.all([load("malware"), load("ransomware")]);
+  let mal = (m?.trending || []).filter((x) => x.iocs).slice(0, 5).map((x) => [x.name, x.iocs]);
+  if (!mal.length && m?.families) mal = Object.entries(m.families).map(([id, f]) => [id.split(".").pop().replace(/_/g, " "), (f.iocs7 || 0) + (f.mentions || 0)]).filter((x) => x[1]).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  bars($("#brewMal"), mal);
+  bars($("#brewSec"), (r?.sectors30 || []).slice(0, 5));
+  put($("#brewSoc"), (n?.soc || []).slice(0, 4).map((x) => h("li", ext(x.u, x.t), h("span.hm", `${x.s} · ${ago(x.d)}`))));
+}

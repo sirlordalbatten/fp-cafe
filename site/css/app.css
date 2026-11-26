@@ -502,7 +502,7 @@ table.cheat td:first-child{font-family:var(--mono);color:var(--sodium);white-spa
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(150px);background:var(--paper);color:var(--paper-ink);padding:10px 18px;border-radius:3px;font-size:15px;transition:transform .35s;z-index:40;max-width:90vw;text-align:center;box-shadow:0 12px 30px #0009}
 .toast.show{transform:translateX(-50%) translateY(0)}
 footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--rule);color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:4px}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important}.goldalert,.mascot svg{animation:none!important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important}.goldalert{animation:none!important}}
 
 /* utility classes generated from the old inline styles live at the end */
 

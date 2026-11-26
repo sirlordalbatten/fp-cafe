@@ -1,24 +1,6 @@
 // Practices from well-run SOCs and the public guides behind them. Each one has a source and a
 // "first week" version, so a team can try it without a programme or a budget.
 export const PRACTICES = [
-  { id: "minimal", tag: "Minimalism", t: "Practise defensive minimalism", from: "Florian Roth, The Age of Defensive Minimalism (2026)", u: "https://cyb3rops.medium.com/the-age-of-defensive-minimalism-b882c2c7144c",
-    why: "AI agents now give every organisation the close, patient look that used to be saved for high-value targets. Being obscure no longer protects you; having less to find does. Start from the smallest set of features, ports, plugins and access that lets people work, and make everything else justify itself.",
-    week: ["List five internet-facing things you run (services, APIs, portals, test servers).", "For each ask: who needs it, what do they gain, could they work without it?", "Pick one with weak answers and put it behind sign-in, narrow it, or switch it off.", "Use the Surface audit tab to keep the list."] },
-  { id: "history", tag: "Minimalism", t: "Hunt your own history before someone else does", from: "Florian Roth, The Age of Defensive Minimalism (2026)", u: "https://cyb3rops.medium.com/the-age-of-defensive-minimalism-b882c2c7144c",
-    why: "Agents read everything you ever published: full repository history, build logs, old packages, forgotten subdomains, job adverts naming internal systems, even old copies of your website in web archives. A secret deleted from a file is still in the history, and still valid until it's rotated.",
-    week: ["Run a secret scanner (for example gitleaks) over the full history of every public repo.", "Check archived copies of your website's JavaScript for keys and internal URLs (Surface audit has the links).", "List subdomains from certificate logs and retire the ones nobody owns.", "Rotate anything you find, then delete it. In that order."] },
-  { id: "defaults", tag: "Minimalism", t: "Switch off the defaults nobody needs", from: "Florian Roth, citing Microsoft's PrintNightmare guidance (CVE-2021-34527)", u: "https://nvd.nist.gov/vuln/detail/CVE-2021-34527",
-    why: "The Print Spooler runs by default on Windows domain controllers, which almost never print. PrintNightmare turned it into code execution as SYSTEM, and Microsoft now recommends disabling it there. That decision could have been made years before the bug. Whoever wants a feature on should be able to say why it's worth defending for the life of the system.",
-    week: ["Check whether the Print Spooler is running on your domain controllers. If yes, plan to disable it.", "List services enabled by default on one server build and remove three unused ones.", "Add 'why is this on?' to your change template."] },
-  { id: "gap", tag: "Response", t: "Shrink the gap between alert and containment", from: "Florian Roth, The Age of Defensive Minimalism (2026)", u: "https://cyb3rops.medium.com/the-age-of-defensive-minimalism-b882c2c7144c",
-    why: "The alert arrives in seconds, but deciding whether revoking a credential will break production can take an hour, and an agent uses that hour to try another route. The fix is knowing, in advance, which systems you can contain immediately. That depends on an asset inventory that's actually right.",
-    week: ["Pick your ten most-alerted assets and agree which ones the SOC may isolate without asking.", "Write that down and get it signed off.", "Fix the criticality field in the inventory for every asset where it was wrong in the last month.", "When revoking, revoke every session and every credential, not just the one you saw."] },
-  { id: "narrowdoor", tag: "Minimalism", t: "Give outsiders a narrow door", from: "Florian Roth, The Age of Defensive Minimalism (2026)", u: "https://cyb3rops.medium.com/the-age-of-defensive-minimalism-b882c2c7144c",
-    why: "A supplier who only uploads a file and checks its status doesn't need an account on the same app your staff use for approvals and payments. A tiny external service that does exactly those two things keeps the internal app out of reach. The same goes for any service that has no reason to accept anonymous requests.",
-    week: ["Pick one internet-facing service that doesn't need anonymous access.", "Put it behind authentication.", "From outside your network, check the origin can't be reached directly (bypassing the proxy or CDN).", "List supplier accounts on internal apps and ask which could use a narrower door."] },
-  { id: "basics", tag: "Minimalism", t: "Be excellent at the basics, not just good", from: "Florian Roth, The Age of Defensive Minimalism (2026)", u: "https://cyb3rops.medium.com/the-age-of-defensive-minimalism-b882c2c7144c",
-    why: "Agents don't need new tricks. They find every gap in the basics, everywhere, at once. Phishing-resistant MFA, password blocklists that reject seasons, months, years and the company name, software allowlisting, faster patching, offline backups and retiring old protocols are what stop an agent once it has found a way in.",
-    week: ["Check your password blocklist rejects 'Company2026!' and 'November2026'. Try it in the Password lab.", "Count accounts without phishing-resistant MFA, starting with admins.", "Test one offline backup restore.", "Pick one legacy protocol (SMBv1, NTLMv1, basic auth) and plan its retirement."] },
   { id: "ads", tag: "Detection", t: "Write down why every detection exists", from: "Palantir's Alerting and Detection Strategy (ADS) framework", u: "https://github.com/palantir/alerting-detection-strategy-framework",
     why: "A rule nobody can explain gets disabled the first busy night. ADS gives each detection a short document: goal, how it works, blind spots, known false positives, how to test it, and what to do when it fires.",
     week: ["Pick your five noisiest rules.", "For each, write one page: goal, blind spots, false positives, response steps.", "Store them next to the rule (same repo or wiki page).", "Link the page from the alert so the analyst sees it at 3 AM."] },
@@ -81,9 +63,6 @@ export const SELFCHECK = [
   ["Post-incident reviews don't name and blame people", "postmortem"],
   ["We know the incident load per shift and act when it's too high", "oncall"],
   ["We report time to contain, not alert counts", "metrics"],
-  ["Every internet-facing service has a named reason to exist", "minimal"],
-  ["Public repos are secret-scanned across their full history", "history"],
-  ["The SOC may contain agreed systems without waiting for approval", "gap"],
 ];
 
 // Where an attentive agent looks. {d} is replaced by the domain the user enters.

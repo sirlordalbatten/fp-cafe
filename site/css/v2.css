@@ -480,7 +480,8 @@ textarea.short{width:100%;min-height:80px;background:var(--night-deep);border:1p
   .lmatch{grid-template-columns:1fr}.detgrid{grid-template-columns:1fr}.r-score{font-size:64px}.idle h2{font-size:40px}
   .mibox{right:10px;bottom:10px;width:calc(100vw - 20px)}
 }
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}}
+/* Reduced motion: stop the big, jarring effects (shakes, jumps, spins, particles, screen flashes); gentle ambient motion stays. */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.001s!important}.shake,.stagewrap.shake,.drow.shake,.lopt.shake,.mascot.react-jump svg,.mascot.react-spin svg,.mach-art.shake-m svg,.mach-art.shake-m .knob,.ciso.hot .avatar,.boom,[class*="spark"]{animation:none!important}}
 /* 404 */
 .nf{max-width:520px;margin:18vh auto;text-align:center;padding:20px}
 .nf h1{font-size:120px;color:var(--sodium)}

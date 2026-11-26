@@ -16,6 +16,7 @@ Add these under **GitHub → Settings → Secrets and variables → Actions → 
 |---|---|---|
 | `NVD_API_KEY` | Higher NVD rate limits, so more CVSS scores per run | nvd.nist.gov/developers/request-an-api-key |
 | `ABUSECH_AUTH_KEY` | ThreatFox and MalwareBazaar trends in the Malware bar | auth.abuse.ch |
+| `CLOUDFLARE_RADAR_TOKEN` | Live attack flows (origin → target arcs) on the Lounge threat map. Create a Cloudflare API token with only **Account › Radar › Read** | dash.cloudflare.com/profile/api-tokens |
 
 Without them everything still works. The Malware bar then ranks families by news mentions instead of IOC counts.
 

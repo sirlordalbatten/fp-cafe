@@ -99,19 +99,33 @@ function note(t) { const el = $("#deskNote"); if (el) typeText(el, t); }
 
 function renderQueue() {
   const box = $("#deskQueue"); if (!box) return; badge();
+  // FLIP: remember where every card was, so after re-rendering only the cards that moved slide, and new ones glide in.
+  const before = new Map([...box.querySelectorAll("[data-id]")].map((e) => [e.dataset.id, e.getBoundingClientRect().top]));
   $("#qInfo").textContent = q.length ? `${q.length} waiting · new ones arrive while this tab is open` : "empty, enjoy it while it lasts";
   const fb = feedback.map((f) => h("div.verdict." + (f.ok ? "ok" : "no"), { role: "status", dataset: { id: f.id } },
     h("div.vd-head", h("b", f.ok ? "Right call" : "Not quite"), h("span.muted.small", ` · ${f.who}: "${f.msg.slice(0, 70)}${f.msg.length > 70 ? "…" : ""}"`),
       h("button.xbtn.sm", { "aria-label": "Dismiss", onclick: () => { feedback = feedback.filter((x) => x !== f); renderQueue(); } }, "×")),
     f.ok ? h("p", h("b", f.right), ". ", f.why) : [h("p", "You picked ", h("b", f.picked), ". The right call was ", h("b", f.right), "."), h("p", f.wrong ? f.wrong + " " : "", f.why)]));
-  if (!q.length) { put(box, fb, h("p.empty", "Inbox zero. Nobody believes you, but well done.")); return; }
+  if (!q.length) { put(box, fb, h("p.empty", "Inbox zero. Nobody believes you, but well done.")); glide(box, before); return; }
   put(box, fb, q.map((t) => {
     const p = who(t); const av = h("span.av"); av.innerHTML = avatar(p.a, 44);
     return h("article.ticket", { dataset: { id: t.id } },
       h("div.tk-head", av, h("div", h("b", p.n), h("span.muted", ` · ${p.t} · ${CH_LABEL[t.ch]}`), p.q ? h("p.muted.small", p.q) : null)),
       h("p.tk-msg", t.m),
-      h("div.routes", ROUTES.map(([k, label]) => h("button.btn.sm.r-" + k, { onclick: () => route(t, k) }, label))));
+      h("div.routes", h("div.rgroup.keep", { role: "group", "aria-label": "Keep it in security" }, btns(t, ["soc", "ir"])),
+        h("div.rgroup", { role: "group", "aria-label": "Not ours" }, btns(t, ["it", "net", "close"]))));
   }));
+  glide(box, before);
+}
+const btns = (t, keys) => keys.map((k) => h("button.btn.sm.r-" + k, { onclick: () => route(t, k) }, ROUTES.find((r) => r[0] === k)[1]));
+function glide(box, before) {
+  if (!box.animate) return;
+  const ease = "cubic-bezier(.22,.8,.24,1)";
+  for (const e of box.querySelectorAll("[data-id]")) {
+    const old = before.get(e.dataset.id); const now = e.getBoundingClientRect().top;
+    if (old === undefined) e.animate([{ opacity: 0, transform: "translateY(-16px) scale(.985)" }, { opacity: 1, transform: "none" }], { duration: 560, easing: ease });
+    else if (Math.abs(old - now) > 1) e.animate([{ transform: `translateY(${old - now}px)` }, { transform: "none" }], { duration: 560, easing: ease });
+  }
 }
 
 function route(t, k) {
@@ -121,11 +135,11 @@ function route(t, k) {
   feedback.unshift({ id: t.id, ok, who: who(t).n, msg: t.m, picked: label(k), right: label(t.a), why: t.w, wrong: ok ? "" : WRONG[k] || "" });
   feedback = feedback.slice(0, 3);
   const entry = feedback[0];
-  setTimeout(() => {   // verdicts clear themselves after 3 seconds
+  setTimeout(() => {   // verdicts clear themselves
     const el = document.querySelector(`.verdict[data-id="${entry.id}"]`);
     if (el) { el.classList.add("leaving"); setTimeout(() => { feedback = feedback.filter((x) => x !== entry); renderQueue(); }, 350); }
     else feedback = feedback.filter((x) => x !== entry);
-  }, entry.ok ? 3000 : 5000);   // right: 3 s, wrong: 5 s (more to read)
+  }, entry.ok ? 4000 : 6000);   // right: 4 s, wrong: 6 s (more to read)
   if (ok) { earn(2, "ticket"); xp(6, "ticket"); ciso = Math.min(100, ciso + 5); sfx("coin"); note(`Right: ${label(t.a)}. ${t.w}`); }
   else {
     ciso = Math.max(0, ciso - 12); sting("fail"); note(`Not quite. You picked "${label(k)}", the right call was "${label(t.a)}". ${t.w}`);

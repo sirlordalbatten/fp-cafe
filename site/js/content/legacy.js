@@ -118,15 +118,15 @@ export const ROLES = ["L1 analyst","IR / L2","Detection eng","Threat hunter","SO
 export const SIEMS = ["Sentinel / Defender","Splunk","Google SecOps","Elastic","QRadar","Other"];
 export const VENDORS = ["Microsoft","Cisco","Fortinet","Palo Alto","Ivanti","Citrix","VMware","Linux","Open source"];
 export const BUDDIES = {
-  sunny:{e:"",n:"Sunny",d:"bubbly L1 who treats every alert like a mystery novel"},
-  dex:{e:"",n:"Dex",d:"deadpan veteran, has seen forty thousand false positives"},
-  rin:{e:"",n:"Rin",d:"quiet threat hunter, three queries ahead of you"},
-  theo:{e:"",n:"Theo",d:"calm IR lead, breathes in incidents, breathes out timelines"},
-  juno:{e:"",n:"Juno",d:"ex red teamer gone blue, chaotic good"},
-  noor:{e:"",n:"Noor",d:"night-shift legend, kind, unshakeable"}};
+  sunny:{e:"",n:"Sunny",d:"L1 analyst. Energetic, curious, asks the questions others skip."},
+  dex:{e:"",n:"Dex",d:"Senior analyst. Deadpan, seen it all, rarely wrong."},
+  rin:{e:"",n:"Rin",d:"Threat hunter. Quiet, precise, three queries ahead."},
+  theo:{e:"",n:"Theo",d:"IR lead. Calm under pressure, writes great timelines."},
+  juno:{e:"",n:"Juno",d:"Ex red teamer. Thinks like the attacker, defends like one."},
+  noor:{e:"",n:"Noor",d:"Night-shift lead. Steady, kind, keeps the team safe."}};
 // Each colleague has their own voice. Mixed into the general chatter.
 export const CHAR_LINES = {
-  sunny:["Ooh, a new alert! Okay, okay, who did it? Let's find out.","Fun fact: every false positive is a tiny lesson in disguise. A very annoying disguise.","I made a playlist for triage. It's 90% synthwave.","Small win: you read the whole alert before deciding. Proud of you.","Water check! I'm on my second bottle. You?","Today's vibe: curious, caffeinated, kind.","If it's weird, write it down. Weird is where the good stuff hides."],
+  sunny:["Ooh, a new alert! Okay, okay, who did it? Let's find out.","Fun fact: every false positive is a tiny lesson in disguise. A very annoying disguise.","I made a playlist for triage. It's 90% synthwave.","Small win: you read the whole alert before deciding. Proud of you.","Water check. I'm on my second bottle.","Today's vibe: curious, caffeinated, kind.","If it's weird, write it down. Weird is where the good stuff hides."],
   dex:["Another impossible travel alert. It's the VPN. It's always the VPN.","I'm not grumpy. This is just my face.","Patch it, log it, close it. Then coffee.","I've seen this alert before. I'll see it again. We are old friends.","Take your break. The SIEM will still be wrong when you get back.","Somebody opened an invoice zip. Of course they did.","Fine. That was actually a good catch."],
   rin:["Hypothesis first. Then the query. Then the coffee.","If it beacons every 60 seconds, it's not a person.","Look at what happened after the alert, not just the alert.","Parent process, child process, network. In that order.","Quiet shifts are the best time to hunt.","Turn a good hunt into a detection, or it didn't happen twice.","I like this one. It's lying about its parent process."],
   theo:["Breathe. Write the timeline. Then decide.","Nobody fixes an incident faster by panicking. Slow is smooth.","Blameless doesn't mean nobody learns. It means everybody does.","Who owns it, what's the impact, what's next. That's the whole meeting.","Containment first, curiosity second.","Good handover notes are a gift to future you.","You did fine today. Really."],
@@ -499,7 +499,7 @@ export const CAST = {
   marco:{n:"Marco",t:"Facilities",a:{bg:"#2A3A20",skin:"#C68C64",hair:"#E8505B",style:"cap",acc:"none",shirt:"#8FD5A6"},q:"Knows where every cable goes. Not which ones matter."},
   sam:{n:"Sam",t:"The intern",a:{bg:"#3A2A40",skin:"#F0CDB0",hair:"#5A3A2A",style:"long",acc:"glasses",shirt:"#F5B841"},q:"Enthusiastic. Has admin ideas."},
   vendor:{n:"Brad",t:"A vendor",a:{bg:"#2A2A2A",skin:"#F1C9A5",hair:"#D9B26A",style:"short",acc:"tie",shirt:"#1C1F27"},q:"Just wants 15 minutes of your time."}};
-export const ROUTES = [["soc","Ours"],["it","Bounce to IT"],["net","Bounce to Network"],["ir","Escalate to IR"],["close","Close it, with a lesson"]];
+export const ROUTES = [["soc","Ours"],["ir","Escalate to IR"],["it","Bounce to IT"],["net","Bounce to Network"],["close","Close it, with a lesson"]];
 export const TICKETS = [
  {f:"kevin",ch:"walk",m:"My mouse is moving really slowly today. Is it a hacker?",a:"it",w:"A slow mouse is hardware or drivers. Call us if it starts moving by itself."},
  {f:"kevin",ch:"email",m:"Got an invoice from a supplier we don't use. Opened it to check. It asked me to enable macros, so I did. Nothing happened?",a:"soc",w:"Enabled macros on an unknown invoice is a likely infection. Isolate the laptop and investigate."},

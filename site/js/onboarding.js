@@ -1,5 +1,5 @@
 // First-visit setup. Everything stays in this browser.
-import { h, modal, toast } from "./core.js";
+import { h, modal, toast, store } from "./core.js";
 import { profile, saveProfile, earn } from "./state.js";
 import { mascot } from "./art.js";
 import { ROLES, SIEMS, VENDORS, BUDDIES } from "./content/legacy.js";
@@ -46,4 +46,25 @@ export function openOnboarding() {
       close();
     } }, "Take a seat"), h("button.btn.ghost", { onclick: () => { saveProfile({ onboarded: true }); close(); } }, "Skip for now")),
   ], { label: "Welcome", wide: true });
+}
+
+/** The six analysts as a picker. onPick(key) is called on selection. */
+export function partnerPicker(cur, onPick) {
+  const wrap = h("div.opt.buddies.team", { role: "radiogroup", "aria-label": "Shift partner" });
+  for (const [k, b] of Object.entries(BUDDIES)) {
+    const art = h("span.bart.mascot"); art.innerHTML = mascot(k, "", "ok", false);
+    const btn = h("button" + (k === cur ? ".on" : ""), { type: "button", role: "radio", "aria-checked": String(k === cur) }, art, h("b", b.n), h("span.bd", b.d));
+    btn.addEventListener("click", () => { [...wrap.children].forEach((x) => { x.classList.toggle("on", x === btn); x.setAttribute("aria-checked", String(x === btn)); }); sfx("pop"); onPick(k); });
+    wrap.append(btn);
+  }
+  return wrap;
+}
+/** Shown once to people who set up before the analysts arrived. */
+export function meetTheTeam() {
+  const p = profile(); let pick = BUDDIES[p.buddy] ? p.buddy : "sunny";
+  let close = () => {};
+  close = modal([h("h2", "Meet the team"), h("p.muted", "Pick who sits next to you this shift. You can switch any time in My corner."),
+    partnerPicker(pick, (k) => { pick = k; }),
+    h("div.row", h("button.btn.primary", { type: "button", onclick: () => { saveProfile({ buddy: pick }); store.set("teamSeen", true); close(); toast(`${BUDDIES[pick].n} is on shift with you.`); } }, "Start the shift"))], { label: "Meet the team", wide: true });
+  store.set("teamSeen", true);
 }
