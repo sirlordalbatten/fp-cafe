@@ -27,13 +27,3 @@ export const GLOSSARY = [
   ["Unbounded consumption", "Abusing an AI service to burn compute or money: very long inputs, loops, or mass requests. Rate limits and budgets are security controls too."],
 ];
 export const OWASP = ["Prompt injection", "Sensitive information disclosure", "Supply chain", "Data and model poisoning", "Improper output handling", "Excessive agency", "System prompt leakage", "Vector and embedding weaknesses", "Misinformation", "Unbounded consumption"];
-
-export const QUESTIONS = [
-  "What data leaves our environment, and is it used for training?",
-  "Can it take actions, or only suggest them? Who approves?",
-  "What does each integration token have access to? Read-only where possible?",
-  "Are prompts, tool calls and outputs logged somewhere we can search?",
-  "How does it handle instructions hidden in alerts, emails or tickets?",
-  "Can it show its evidence for every verdict?",
-  "What happens when it's wrong, and how would we know?",
-];

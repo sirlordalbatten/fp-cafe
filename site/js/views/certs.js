@@ -14,12 +14,13 @@ const TIPS = [
   "Write it up like a real ticket or report. Most practical exams grade the write-up.",
   "Practise under time pressure at least twice before the real exam.",
 ];
-let data = null, path = "all";
+let data = null, path = "all", q = "", issuer = "";
 const plan = () => arr(store.get("certPlan", [])).filter((x) => typeof x === "string").slice(0, 30);
 
 export async function mount(sec) {
   html(sec, `<div class="vh"><h1>Certifications</h1><p>Which cert next, and how to pass it. Official links are checked every week.</p></div>
   <div class="seg wraptabs" id="cpaths"></div>
+  <div class="cfilter"><input type="search" id="cq" placeholder="Search certs, e.g. GIAC, forensics, AWS" aria-label="Search certifications" maxlength="60" autocomplete="off"><select id="cby" aria-label="Issuer"></select><span class="muted small" id="ccount"></span></div>
   <div class="two wide-left">
     <div class="roadmap" id="roadmap"></div>
     <aside class="stack">
@@ -30,18 +31,25 @@ export async function mount(sec) {
   </div>`);
   put($("#ctips"), TIPS.map((t) => h("li", t)));
   put($("#cpaths"), PATHS.map(([k, l]) => h("button" + (k === path ? ".on" : ""), { type: "button", onclick: (e) => { path = k; [...$("#cpaths").children].forEach((x) => x.classList.toggle("on", x === e.currentTarget)); roadmap(); } }, l)));
+  $("#cq").addEventListener("input", (e) => { q = e.target.value.trim().toLowerCase(); roadmap(); });
+  $("#cby").addEventListener("change", (e) => { issuer = e.target.value; roadmap(); });
   await refresh();
 }
 export async function refresh() {
   data = await load("certs");
   $("#cupd").textContent = data?.checked ? `links checked ${ago(data.checked)}` : "";
   put($("#cnews"), data?.news?.length ? data.news.map((n) => h("li", ext(n.u, n.t), h("span.hm", `${n.s} · ${ago(n.d)}`))) : [h("li.muted", "No certification news this week.")]);
+  const by = [...new Set((data?.certs || []).map((c) => c.by))].sort((a, b) => a.localeCompare(b));
+  put($("#cby"), h("option", { value: "" }, "All issuers"), by.map((b) => h("option", { value: b, selected: b === issuer }, b)));
   roadmap(); planUI();
 }
 
 function roadmap() {
-  const box = $("#roadmap"); const certs = (data?.certs || []).filter((c) => path === "all" || c.path === path);
-  if (!certs.length) { put(box, h("p.muted", "The certification list appears after the first data refresh.")); return; }
+  const box = $("#roadmap");
+  const certs = (data?.certs || []).filter((c) => (path === "all" || c.path === path) && (!issuer || c.by === issuer)
+    && (!q || `${c.n} ${c.by} ${c.focus} ${c.path}`.toLowerCase().includes(q)));
+  const cc = $("#ccount"); if (cc) cc.textContent = data?.certs?.length ? `${certs.length} of ${data.certs.length}` : "";
+  if (!certs.length) { put(box, h("p.muted", data?.certs?.length ? "No certs match. Try another word or clear the filters." : "The certification list appears after the first data refresh.")); return; }
   const mine = new Set(plan());
   put(box, LEVELS.map(([lv, label], i) => {
     const list = certs.filter((c) => c.level === lv);

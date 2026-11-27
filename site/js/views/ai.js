@@ -5,7 +5,7 @@ import { load, cveList } from "../data.js";
 import { detail, status, productName } from "../cvecard.js";
 import { bump, xp } from "../state.js";
 import { sfx } from "../audio.js";
-import { INJECTION, GLOSSARY, OWASP, QUESTIONS } from "../content/ai.js";
+import { INJECTION, GLOSSARY, OWASP } from "../content/ai.js";
 import { isAiCve, mcpRisk, fromKev, fromFamily, fromMcp, scanInjection, INJ_SAMPLE } from "../content/aigen.js";
 import { FAMILIES } from "../content/malware.js";
 
@@ -20,7 +20,7 @@ export async function mount(sec) {
     <div class="panel"><div class="ph"><h3>What's new</h3><span class="muted" id="aiUpd"></span></div><div class="seg" id="aiTags"></div><ul class="wire big" id="aiFeed"></ul></div>
     <div class="stack">
       <div class="panel"><div class="ph"><h3>AI products with live CVEs</h3><span class="muted small">from today's CVE feed</span></div><ul class="aicve" id="aiCves"></ul></div>
-      <div class="panel"><div class="ph"><h3>Before you buy an "AI SOC" tool</h3></div><ol class="tight" id="aiQ"></ol></div>
+      <div class="panel"><div class="ph"><h3>AI library advisories</h3><span class="muted small" id="advUpd">GitHub Advisory Database</span></div><ul class="advl" id="aiAdv"></ul></div>
     </div>
   </div>
   <div class="panel"><div class="ph"><h3>Fresh on the MCP registry</h3><span class="muted small" id="mcpSub">newest servers people can plug into their AI assistants, with what each one could touch</span></div>
@@ -54,7 +54,6 @@ export async function mount(sec) {
   $("#scSel").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; sc = +b.dataset.i; step = 0; [...$("#scSel").children].forEach((x) => x.classList.toggle("on", x === b)); agent(); });
   put($("#aiTags"), TAGS.map(([k, l]) => h("button" + (k === tag ? ".on" : ""), { dataset: { t: k } }, l)));
   $("#aiTags").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; tag = b.dataset.t; [...$("#aiTags").children].forEach((x) => x.classList.toggle("on", x === b)); feed(); });
-  put($("#aiQ"), QUESTIONS.map((q) => h("li", q)));
   glossary();
   $("#owasp").textContent = "OWASP Top 10 for LLM applications (2025): " + OWASP.map((x, i) => `LLM${String(i + 1).padStart(2, "0")} ${x}`).join(" · ");
   await refresh();
@@ -62,7 +61,8 @@ export async function mount(sec) {
 }
 
 export async function refresh() {
-  const [n, c, m] = await Promise.all([load("news"), load("cves"), load("malware")]);
+  const [n, c, m, adv] = await Promise.all([load("news"), load("cves"), load("malware"), load("advisories")]);
+  advUI(adv);
   news = n?.ai || []; mcp = n?.mcp || [];
   const list = cveList(c);
   aiCves = list.filter(isAiCve).slice(0, 8);
@@ -98,6 +98,14 @@ function feed() {
 function cvesUI() {
   put($("#aiCves"), aiCves.length ? aiCves.map((c) => { const [st, cls] = status(c); return h("li", h("button.rt", { type: "button", onclick: () => detail(c) }, h("span.rt-id", c.id), h("span.rt-p", productName(c)), h("span.pill.stp." + cls, st))); })
     : [h("li.muted", "No AI products in the current exploited or critical list. Good week. The registry below still needs watching.")]);
+}
+// Security advisories for popular AI/ML and agent libraries (LangChain, vLLM, MCP SDKs, Ollama...).
+function advUI(adv) {
+  const items = adv?.items || [];
+  $("#advUpd").textContent = adv?.generated ? `GitHub Advisory Database · ${ago(adv.generated)}` : "GitHub Advisory Database";
+  const SEV = { critical: "p-crit", high: "p-high", medium: "p-med", low: "p-unk", unknown: "p-unk" };
+  put($("#aiAdv"), items.length ? items.slice(0, 8).map((a) => h("li", h("span.pill." + SEV[a.sev], a.sev), h("div.adv-b", ext(a.u, a.t), h("span.hm", [a.pkg, a.eco, a.cve, ago(a.d)].filter(Boolean).join(" · ")))))
+    : [h("li.muted", "Advisories for AI libraries appear after the next data refresh.")]);
 }
 function mcpUI() {
   const lvl = { high: ["Can do damage", "p-crit"], med: ["Handle with care", "p-high"], low: ["Low reach", "p-unk"] };

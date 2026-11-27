@@ -11,7 +11,7 @@ import { startDesk } from "./views/desk.js";
 import { applyTheme } from "./views/shop.js";
 import { openOnboarding, meetTheTeam } from "./onboarding.js";
 
-const VIEWS = ["lounge", "desk", "brew", "menu", "malware", "ai", "detect", "toolbox", "playbook", "phishsim", "arcade", "boards", "socdle", "tycoon", "pwlab", "breakroom", "shift", "learn", "certs", "shop", "me"];
+const VIEWS = ["lounge", "underattack", "desk", "brew", "menu", "malware", "ai", "detect", "toolbox", "playbook", "phishsim", "arcade", "boards", "socdle", "tycoon", "pwlab", "breakroom", "shift", "learn", "certs", "shop", "me"];
 const mods = {};
 let current = null;
 

@@ -317,10 +317,14 @@ class ThreatMapAndCerts(unittest.TestCase):
             return json.dumps({"result": {"top_0": [{"originCountryAlpha2": "US", "value": "30.1"}]}}).encode()
         if "locations/target" in url:
             return json.dumps({"result": {"top_0": [{"targetCountryAlpha2": "SG", "value": "9.9"}]}}).encode()
+        if "summary/industry" in url:
+            return json.dumps({"result": {"summary_0": {"Retail": "21.5", "Other": "40", "<img src=x>": "9", "Gambling & Casinos": "12"}}}).encode()
+        if "summary/mitigation_product" in url:
+            return json.dumps({"result": {"summary_0": {"WAF": "60.1", "DDOS": "30.2"}}}).encode()
         raise IOError("unexpected " + url)
 
     def test_threatmap_counts_only_and_sanitised(self):
-        with mock.patch.object(R, "http_get", side_effect=self._fake), mock.patch.dict(os.environ, {"CLOUDFLARE_RADAR_TOKEN": "t"}):
+        with mock.patch.object(R, "http_get", side_effect=self._fake), mock.patch.object(R.time, "sleep"), mock.patch.dict(os.environ, {"CLOUDFLARE_RADAR_TOKEN": "t"}):
             d = R.build_threatmap({})
         R.validate("threatmap", d)
         blob = json.dumps(d)
@@ -330,6 +334,25 @@ class ThreatMapAndCerts(unittest.TestCase):
         self.assertEqual(d["ports"][0][0], 445)
         self.assertEqual(d["radar"]["pairs"], [["US", "SG", 12.5]])
         self.assertEqual(d["infocon"], "green")
+        self.assertEqual(d["radar"]["industries"], [["Retail", 21.5], ["Gambling & Casinos", 12.0]])
+        self.assertEqual(d["radar"]["mitigation"][0], ["WAF", 60.1])
+        self.assertEqual(len(d["daily"]), 14)
+        self.assertEqual(d["daily"][-1][1], 2100)
+
+    def test_threatmap_daily_only_fetches_missing_days(self):
+        days = [(R.NOW - R.dt.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(14, 0, -1)]
+        prev = {"daily": [[d, 5] for d in days[:-1]]}
+        calls = []
+        def fake(url, **kw):
+            if "records/10/" in url:
+                calls.append(url)
+            return self._fake(url, **kw)
+        env = {k: v for k, v in os.environ.items() if k != "CLOUDFLARE_RADAR_TOKEN"}
+        with mock.patch.object(R, "http_get", side_effect=fake), mock.patch.object(R.time, "sleep"), mock.patch.dict(os.environ, env, clear=True):
+            d = R.build_threatmap(prev)
+        self.assertEqual(len(calls), 1)
+        self.assertIn(days[-1], calls[0])
+        R.validate("threatmap", d)
 
     def test_threatmap_failure_keeps_previous_and_no_token_skips_radar(self):
         prev = {"generated": "x", "c2": {"total": 1, "online": 1, "countries": [["US", 1]], "malware": []}, "ports": [[22, 5, 1, 1]], "infocon": "yellow"}
@@ -355,3 +378,45 @@ class ThreatMapAndCerts(unittest.TestCase):
         with mock.patch.object(R, "link_ok", side_effect=AssertionError("should not recheck within a week")):
             d2 = R.build_certs(d, [])
         self.assertEqual(d2["checked"], d["checked"])
+
+
+class AdvisoriesContactsGov(unittest.TestCase):
+    def test_advisories_sanitised_and_deduped(self):
+        row = {"ghsa_id": "GHSA-c2fg-hjmp-qrvw", "cve_id": "CVE-2026-1234", "summary": "RCE in <b>loader</b>", "severity": "critical",
+               "published_at": R.iso(R.NOW), "html_url": "https://github.com/advisories/GHSA-c2fg-hjmp-qrvw"}
+        bad = {"ghsa_id": "nope", "summary": "x", "published_at": R.iso(R.NOW), "html_url": "https://evil.example/"}
+        with mock.patch.object(R, "http_get", return_value=json.dumps([row, bad]).encode()):
+            d = R.build_advisories({})
+        R.validate("advisories", d)
+        self.assertEqual(len(d["items"]), 1)
+        self.assertNotIn("<b>", d["items"][0]["t"])
+
+    def test_advisories_all_fail_keeps_previous(self):
+        prev = {"generated": "x", "items": [{"id": "GHSA-c2fg-hjmp-qrvw"}]}
+        with mock.patch.object(R, "http_get", side_effect=IOError("down")):
+            d = R.build_advisories(prev)
+        self.assertEqual(d["items"], prev["items"])
+        self.assertEqual(d["status"]["GitHub advisories"], "stale")
+
+    def test_contacts_from_yaml(self):
+        with mock.patch.object(R, "link_ok", side_effect=lambda u: "ic3" not in u):
+            d = R.build_contacts({})
+        R.validate("contacts", d)
+        self.assertIn("SG", d["countries"])
+        self.assertIn("US", d["countries"])
+        ic3 = next(c for c in d["countries"]["US"]["items"] if c["n"] == "FBI IC3")
+        self.assertFalse(ic3["ok"])
+        self.assertTrue(any(c["n"] == "No More Ransom" for c in d["global"]))
+        with mock.patch.object(R, "link_ok", side_effect=AssertionError("weekly only")):
+            d2 = R.build_contacts(d)
+        self.assertEqual(d2["checked"], d["checked"])
+
+    def test_gov_feed_hosts_enforced(self):
+        rss = b"""<?xml version="1.0"?><rss><channel>
+<item><title>#StopRansomware: Example</title><link>https://www.cisa.gov/news-events/cybersecurity-advisories/aa26-001a</link><pubDate>Wed, 25 Nov 2026 10:00:00 GMT</pubDate></item>
+<item><title>Phish</title><link>https://cisa.gov.evil.example/x</link><pubDate>Wed, 25 Nov 2026 10:00:00 GMT</pubDate></item>
+</channel></rss>"""
+        items = R.parse_feed(rss, "CISA", ["cisa.gov"])
+        self.assertEqual(len(items), 1)
+        R.tag_items(items, R.GOV_TAGS)
+        self.assertIn("ransomware", items[0]["g"])

@@ -260,6 +260,12 @@ AI_FEEDS = [
     ("Ollama", "https://github.com/ollama/ollama/releases.atom", ["github.com"]),
 ]
 
+GOV_FEEDS = [
+    ("CISA", "https://www.cisa.gov/cybersecurity-advisories/all.xml", ["cisa.gov"]),
+    ("NCSC UK", "https://www.ncsc.gov.uk/api/1/services/v1/all-rss-feed.xml", ["ncsc.gov.uk"]),
+]
+GOV_TAGS = [("ransomware", re.compile(r"(?i)ransom|#stopransomware")), ("ics", re.compile(r"(?i)\bics\b|industrial|scada|\bot\b")),
+            ("exploited", re.compile(r"(?i)exploit|zero-day|0-day|actively")), ("advisory", re.compile(r"(?i)advisory|alert|guidance"))]
 SOC_FEEDS = [
     ("Red Canary", "https://redcanary.com/feed/", ["redcanary.com"]),
     ("Expel", "https://expel.com/feed/", ["expel.com"]),
@@ -729,6 +735,7 @@ FEODO = "https://feodotracker.abuse.ch/downloads/ipblocklist.json"
 ISC = "https://isc.sans.edu/api"
 RADAR = "https://api.cloudflare.com/client/v4/radar"
 CC_RE = re.compile(r"^[A-Z]{2}$")
+NAME_RE = re.compile(r"^[A-Za-z0-9_ &,./()'+-]{1,50}$")
 MAL_RE = re.compile(r"^[A-Za-z0-9 ._-]{1,40}$")
 
 
@@ -783,6 +790,22 @@ def build_threatmap(prev: dict) -> dict:
         if prev.get("ports"):
             out["ports"] = prev["ports"]
         out["status"]["SANS ISC"] = "stale" if prev.get("ports") else "failed"
+    # Daily attack reports (sum of the top-10 port records) for the last 14 complete days; only missing days are fetched.
+    have = {d: n for d, n in (prev.get("daily") or []) if isinstance(d, str) and isinstance(n, int)}
+    days = [(NOW - dt.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(14, 0, -1)]
+    for d in days:
+        if d in have:
+            continue
+        try:
+            raw = get_json(f"{ISC}/topports/records/10/{d}?json")
+            rows = raw.values() if isinstance(raw, dict) else raw
+            tot = sum(int(r.get("records") or 0) for r in rows if isinstance(r, dict) and "targetport" in r)
+            if tot:
+                have[d] = tot
+        except Exception as e:  # noqa: BLE001
+            log(f"[threatmap] isc daily {d}: {type(e).__name__}")
+        time.sleep(1)                                      # be gentle with ISC: one request per second at most
+    out["daily"] = [[d, have[d]] for d in days if d in have]
     try:
         ic = str(get_json(f"{ISC}/infocon?json").get("status") or "").lower()
         out["infocon"] = ic if ic in ("green", "yellow", "orange", "red") else prev.get("infocon", "")
@@ -794,21 +817,90 @@ def build_threatmap(prev: dict) -> dict:
     if tok:
         try:
             h = {"Authorization": "Bearer " + tok}
-            pairs = get_json(f"{RADAR}/attacks/layer7/top/attacks?limit=24&dateRange=1d&limitDirection=ORIGIN&limitPerLocation=3&format=json", headers=h)["result"]["top_0"]
-            org = get_json(f"{RADAR}/attacks/layer7/top/locations/origin?limit=10&dateRange=1d&format=json", headers=h)["result"]["top_0"]
-            tgt = get_json(f"{RADAR}/attacks/layer7/top/locations/target?limit=10&dateRange=1d&format=json", headers=h)["result"]["top_0"]
             f = lambda v: round(float(v), 3)
-            out["radar"] = {
-                "pairs": [[p["originCountryAlpha2"], p["targetCountryAlpha2"], f(p["value"])] for p in pairs if CC_RE.match(str(p.get("originCountryAlpha2"))) and CC_RE.match(str(p.get("targetCountryAlpha2")))],
-                "origins": [[p["originCountryAlpha2"], f(p["value"])] for p in org if CC_RE.match(str(p.get("originCountryAlpha2")))],
-                "targets": [[p["targetCountryAlpha2"], f(p["value"])] for p in tgt if CC_RE.match(str(p.get("targetCountryAlpha2")))]}
+            ok_cc = lambda x: bool(CC_RE.match(str(x)))
+            q = "format=json&dateRange=1d"
+            pairs = get_json(f"{RADAR}/attacks/layer7/top/attacks?limit=24&limitDirection=ORIGIN&limitPerLocation=3&{q}", headers=h)["result"]["top_0"]
+            org = get_json(f"{RADAR}/attacks/layer7/top/locations/origin?limit=10&{q}", headers=h)["result"]["top_0"]
+            tgt = get_json(f"{RADAR}/attacks/layer7/top/locations/target?limit=10&{q}", headers=h)["result"]["top_0"]
+            radar = {
+                "pairs": [[p["originCountryAlpha2"], p["targetCountryAlpha2"], f(p["value"])] for p in pairs if ok_cc(p.get("originCountryAlpha2")) and ok_cc(p.get("targetCountryAlpha2"))],
+                "origins": [[p["originCountryAlpha2"], f(p["value"])] for p in org if ok_cc(p.get("originCountryAlpha2"))],
+                "targets": [[p["targetCountryAlpha2"], f(p["value"])] for p in tgt if ok_cc(p.get("targetCountryAlpha2"))]}
+            # extras: each is optional, a failure only drops that layer
+            try:
+                p3 = get_json(f"{RADAR}/attacks/layer3/top/attacks?limit=16&limitDirection=ORIGIN&limitPerLocation=3&{q}", headers=h)["result"]["top_0"]
+                radar["pairs3"] = [[p["originCountryAlpha2"], p["targetCountryAlpha2"], f(p["value"])] for p in p3 if ok_cc(p.get("originCountryAlpha2")) and ok_cc(p.get("targetCountryAlpha2"))]
+            except Exception as e:  # noqa: BLE001
+                log(f"[threatmap] radar l3: {type(e).__name__}: {str(e)[:100]}")
+            try:
+                ser = get_json(f"{RADAR}/attacks/layer7/timeseries?dateRange=7d&aggInterval=1h&format=json", headers=h)["result"]["serie_0"]
+                ts, vs = ser.get("timestamps", []), ser.get("values", [])
+                pts = [[str(t)[:16], f(v)] for t, v in zip(ts, vs)]
+                radar["series"] = pts[-168:][::4]          # 7 days, one point every 4 h
+            except Exception as e:  # noqa: BLE001
+                log(f"[threatmap] radar series: {type(e).__name__}: {str(e)[:100]}")
+            out["radar"] = radar
             out["status"]["Cloudflare Radar"] = "ok"
+            for dim, key in (("industry", "industries"), ("mitigation_product", "mitigation")):
+                try:
+                    summ = get_json(f"{RADAR}/attacks/layer7/summary/{dim}?dateRange=1d&format=json", headers=h)["result"]["summary_0"]
+                    rows = [[clean(k, 50), f(v)] for k, v in summ.items() if isinstance(k, str) and NAME_RE.match(k) and k.lower() != "other"]
+                    out["radar"][key] = sorted(rows, key=lambda x: -x[1])[:8]
+                except Exception as e2:  # noqa: BLE001
+                    log(f"[threatmap] radar {dim}: {type(e2).__name__}: {str(e2)[:100]}")
+                    out["radar"][key] = (prev.get("radar") or {}).get(key, [])
         except Exception as e:  # noqa: BLE001
             log(f"[threatmap] radar: {type(e).__name__}: {str(e)[:120]}")
             if prev.get("radar"):
                 out["radar"] = prev["radar"]
             out["status"]["Cloudflare Radar"] = "stale" if prev.get("radar") else "failed"
     return out
+
+
+# --------------------------------------------------------------------------
+# AI library advisories: GitHub's reviewed security advisories for popular AI/ML and agent packages.
+# --------------------------------------------------------------------------
+AI_PKGS = [("pip", "langchain"), ("pip", "langchain-core"), ("pip", "langchain-community"), ("pip", "llama-index"), ("pip", "transformers"),
+           ("pip", "vllm"), ("pip", "mlflow"), ("pip", "gradio"), ("pip", "litellm"), ("pip", "langflow"), ("pip", "open-webui"),
+           ("pip", "torch"), ("pip", "keras"), ("pip", "ray"), ("pip", "jupyter-server"), ("pip", "mcp"),
+           ("npm", "@modelcontextprotocol/sdk"), ("npm", "ai"), ("npm", "langchain"), ("npm", "@langchain/core"),
+           ("go", "github.com/ollama/ollama")]
+GHSA_RE = re.compile(r"^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$")
+
+
+def build_advisories(prev: dict) -> dict:
+    hdr = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+    if os.environ.get("GITHUB_TOKEN"):
+        hdr["Authorization"] = "Bearer " + os.environ["GITHUB_TOKEN"]
+    seen, items, fails = set(), [], 0
+    for eco, pkg in AI_PKGS:
+        try:
+            rows = get_json(f"https://api.github.com/advisories?type=reviewed&ecosystem={eco}&affects={urllib.parse.quote(pkg, safe='')}&per_page=10&sort=published&direction=desc", headers=hdr)
+        except Exception as e:  # noqa: BLE001
+            fails += 1
+            log(f"[advisories] {pkg}: {type(e).__name__}: {str(e)[:80]}")
+            continue
+        for a in rows if isinstance(rows, list) else []:
+            gid = str(a.get("ghsa_id", ""))
+            if not GHSA_RE.match(gid) or gid in seen:
+                continue
+            d = parse_date(a.get("published_at"))
+            if not d or (NOW - d).days > 180:
+                continue
+            u = safe_url(a.get("html_url"), "*")
+            if not u or not u.startswith("https://github.com/"):
+                continue
+            seen.add(gid)
+            cve = str(a.get("cve_id") or "")
+            sev = str(a.get("severity") or "").lower()
+            items.append({"id": gid, "cve": cve if CVE_RE.match(cve) else "", "t": clean(a.get("summary"), 200), "sev": sev if sev in ("low", "medium", "high", "critical") else "unknown",
+                          "pkg": clean(pkg, 60), "eco": eco, "d": iso(d), "u": u})
+    if fails == len(AI_PKGS):
+        log("[advisories] all requests failed; keeping previous")
+        return {**prev, "status": {"GitHub advisories": "stale" if prev.get("items") else "failed"}} if prev else {"generated": iso(NOW), "items": [], "status": {"GitHub advisories": "failed"}}
+    items.sort(key=lambda x: x["d"], reverse=True)
+    return {"generated": iso(NOW), "items": items[:30], "status": {"GitHub advisories": "ok" if not fails else f"{len(AI_PKGS) - fails}/{len(AI_PKGS)} packages"}}
 
 
 # --------------------------------------------------------------------------
@@ -855,6 +947,42 @@ def build_certs(prev: dict, news_items: list) -> dict:
     news = [i for i in news_items if rx.search(i.get("t", "") + " " + i.get("x", ""))][:12]
     return {"generated": iso(NOW), "checked": iso(NOW) if recheck else prev.get("checked"), "certs": certs, "news": news,
             "status": {"links": f"{sum(c['ok'] for c in certs)}/{len(certs)} official pages reachable"}}
+
+
+# --------------------------------------------------------------------------
+# Under attack: who to contact, per country, links re-checked weekly.
+# --------------------------------------------------------------------------
+CONTACT_KINDS = {"cert", "police", "reg", "help"}
+
+
+def build_contacts(prev: dict) -> dict:
+    if yaml is None:
+        raise RuntimeError("PyYAML is required for contacts")
+    with open(os.path.join(HERE, "contacts.yaml"), encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+    last = parse_date(prev.get("checked"))
+    recheck = not last or (NOW - last).days >= 7
+    old = {(c.get("n"), c.get("home")): c.get("ok", True) for grp in [prev.get("global", []), prev.get("guides", [])] + [v.get("items", []) for v in (prev.get("countries") or {}).values()] for c in grp if isinstance(c, dict)}
+
+    def item(c):
+        if c.get("kind") not in CONTACT_KINDS:
+            return None
+        u, home = safe_url(c.get("u"), "*"), safe_url(c.get("home"), "*")
+        if not u or not home:
+            return None
+        ok = link_ok(u) if recheck else old.get((clean(c.get("n"), 60), home), True)
+        return {"kind": c["kind"], "n": clean(c.get("n"), 60), "what": clean(c.get("what"), 200), "u": u if ok else home, "home": home, "ok": bool(ok)}
+
+    countries = {}
+    for cc, v in (raw.get("countries") or {}).items():
+        if not re.match(r"^[A-Z]{2}$", str(cc)):
+            continue
+        items = [x for x in (item(c) for c in v.get("items", [])) if x]
+        if items:
+            countries[cc] = {"name": clean(v.get("name"), 60), "items": items}
+    glob = [x for x in (item(c) for c in raw.get("global", [])) if x]
+    guides = [x for x in (item(c) for c in raw.get("guides", [])) if x]
+    return {"generated": iso(NOW), "checked": iso(NOW) if recheck else prev.get("checked"), "countries": countries, "global": glob, "guides": guides}
 
 
 # --------------------------------------------------------------------------
@@ -1164,7 +1292,7 @@ def validate(kind: str, data: dict) -> None:
             if not CVE_RE.match(cid) or not (isinstance(v, list) and len(v) == 2):
                 raise Invalid("epss")
     elif kind == "news":
-        for grp in ("security", "ai", "soc"):
+        for grp in ("security", "ai", "soc", "gov"):
             for i in data.get(grp, []):
                 _check_item(i, grp)
                 _check_str(i.get("x", ""), 260, grp + ".x")
@@ -1196,10 +1324,48 @@ def validate(kind: str, data: dict) -> None:
         for p in r.get("pairs", []):
             if not (len(p) == 3 and CC_RE.match(p[0]) and CC_RE.match(p[1]) and isinstance(p[2], (int, float))):
                 raise Invalid("threatmap.radar.pairs")
+        for p in r.get("pairs3", []):
+            if not (len(p) == 3 and CC_RE.match(p[0]) and CC_RE.match(p[1]) and isinstance(p[2], (int, float))):
+                raise Invalid("threatmap.radar.pairs3")
         for k in ("origins", "targets"):
             for p in r.get(k, []):
                 if not (len(p) == 2 and CC_RE.match(p[0]) and isinstance(p[1], (int, float))):
                     raise Invalid("threatmap.radar." + k)
+        for k in ("industries", "mitigation"):
+            for p in r.get(k, []):
+                if not (len(p) == 2 and isinstance(p[0], str) and NAME_RE.match(p[0]) and isinstance(p[1], (int, float))):
+                    raise Invalid("threatmap.radar." + k)
+        for p in data.get("daily", []):
+            if not (len(p) == 2 and re.match(r"^\d{4}-\d{2}-\d{2}$", p[0]) and isinstance(p[1], int)):
+                raise Invalid("threatmap.daily")
+        for p in r.get("series", []):
+            if not (len(p) == 2 and re.match(r"^\d{4}-\d\d-\d\dT\d\d:\d\d$", p[0]) and isinstance(p[1], (int, float))):
+                raise Invalid("threatmap.radar.series")
+        for p in r.get("industries", []):
+            if not (len(p) == 2 and isinstance(p[1], (int, float))):
+                raise Invalid("threatmap.radar.industries")
+            _check_str(p[0], 50, "threatmap.industry", False)
+    elif kind == "advisories":
+        for a in data.get("items", []):
+            if not GHSA_RE.match(a["id"]) or (a["cve"] and not CVE_RE.match(a["cve"])) or a["eco"] not in ("pip", "npm", "go") or a["sev"] not in ("low", "medium", "high", "critical", "unknown"):
+                raise Invalid("advisories.item")
+            _check_str(a["t"], 200, "advisories.t", False)
+            _check_str(a["pkg"], 60, "advisories.pkg", False)
+            _check_url(a["u"], "advisories.u")
+    elif kind == "contacts":
+        groups = [data.get("global", []), data.get("guides", [])] + [v["items"] for v in data.get("countries", {}).values()]
+        for cc, v in data.get("countries", {}).items():
+            if not CC_RE.match(cc):
+                raise Invalid("contacts.cc")
+            _check_str(v["name"], 60, "contacts.name", False)
+        for g in groups:
+            for c in g:
+                if c["kind"] not in CONTACT_KINDS:
+                    raise Invalid("contacts.kind")
+                _check_str(c["n"], 60, "contacts.n", False)
+                _check_str(c["what"], 200, "contacts.what")
+                _check_url(c["u"], "contacts.u")
+                _check_url(c["home"], "contacts.home")
     elif kind == "certs":
         for c in data["certs"]:
             for f, n in (("n", 80), ("by", 40), ("focus", 200)):
@@ -1264,12 +1430,12 @@ def write(out_dir: str, name: str, data: dict) -> None:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(HERE, "..", "site", "data"))
-    ap.add_argument("--only", choices=["cves", "news", "malware", "detections", "ransomware", "threatmap", "certs"], action="append")
+    ap.add_argument("--only", choices=["cves", "news", "malware", "detections", "ransomware", "threatmap", "certs", "advisories", "contacts"], action="append")
     ap.add_argument("--validate", action="store_true", help="only validate existing files")
     a = ap.parse_args(argv)
     out = os.path.abspath(a.out)
     os.makedirs(out, exist_ok=True)
-    kinds = a.only or ["news", "cves", "malware", "detections", "ransomware", "threatmap", "certs"]
+    kinds = a.only or ["news", "cves", "malware", "detections", "ransomware", "threatmap", "certs", "advisories", "contacts"]
 
     if a.validate:
         bad = 0
@@ -1293,7 +1459,8 @@ def main(argv=None) -> int:
         ai, s2 = fetch_feeds(AI_FEEDS, news_prev.get("ai", []), AI_TAGS, "ai")
         soc, s3 = fetch_feeds(SOC_FEEDS, news_prev.get("soc", []), SOC_TAGS, "soc")
         mcp, s4 = build_mcp(news_prev.get("mcp", []))
-        news = {"generated": iso(NOW), "status": {**s1, **s2, **s3, "MCP registry": s4}, "security": sec, "ai": ai, "soc": soc, "mcp": mcp}
+        gov, s5 = fetch_feeds(GOV_FEEDS, news_prev.get("gov", []), GOV_TAGS, "gov")
+        news = {"generated": iso(NOW), "status": {**s1, **s2, **s3, **s5, "MCP registry": s4}, "security": sec, "ai": ai, "soc": soc, "mcp": mcp, "gov": gov[:40]}
         if "news" in kinds:
             results["news"] = news
     if "cves" in kinds:
@@ -1306,6 +1473,10 @@ def main(argv=None) -> int:
         results["ransomware"] = build_ransomware(load_prev(out, "ransomware"))
     if "threatmap" in kinds:
         results["threatmap"] = build_threatmap(load_prev(out, "threatmap"))
+    if "advisories" in kinds:
+        results["advisories"] = build_advisories(load_prev(out, "advisories"))
+    if "contacts" in kinds:
+        results["contacts"] = build_contacts(load_prev(out, "contacts"))
     if "certs" in kinds:
         n = news or {}
         results["certs"] = build_certs(load_prev(out, "certs"), n.get("security", []) + n.get("soc", []))

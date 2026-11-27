@@ -16,9 +16,11 @@ Add these under **GitHub → Settings → Secrets and variables → Actions → 
 |---|---|---|
 | `NVD_API_KEY` | Higher NVD rate limits, so more CVSS scores per run | nvd.nist.gov/developers/request-an-api-key |
 | `ABUSECH_AUTH_KEY` | ThreatFox and MalwareBazaar trends in the Malware bar | auth.abuse.ch |
-| `CLOUDFLARE_RADAR_TOKEN` | Live attack flows (origin → target arcs) on the Lounge threat map. Create a Cloudflare API token with only **Account › Radar › Read** | dash.cloudflare.com/profile/api-tokens |
+| `CLOUDFLARE_RADAR_TOKEN` | Live attack flows (origin → target arcs, web attacks and DDoS), most attacked industries and how attacks were stopped on the Lounge threat map. Create a Cloudflare API token with only **Account › Radar › Read** | dash.cloudflare.com/profile/api-tokens |
 
 Without them everything still works. The Malware bar then ranks families by news mentions instead of IOC counts.
+
+The AI library advisories use the workflow's built-in `GITHUB_TOKEN`, so there is nothing to add for them. The Under attack contact list lives in `pipeline/contacts.yaml` and the certifications in `pipeline/certs.yaml`; the pipeline checks every link in both once a week and falls back to the organisation's home page if one breaks.
 
 ## 2. Leaderboards (Cloudflare D1)
 1. **Create the database.** Go to Cloudflare dashboard → **Storage & Databases → D1 → Create**. Name it `fpcafe`.

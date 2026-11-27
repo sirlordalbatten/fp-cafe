@@ -47,7 +47,7 @@ const CLEAN = {
     const item = (i) => ({ t: t(i?.t, 200), u: url(i?.u), s: t(i?.s, 60), d: isoOk(i?.d) || "", x: t(i?.x, 260), g: arr(i?.g).map((g) => t(g, 20)).slice(0, 3) });
     const mcp = arr(d.mcp).map((m) => ({ t: t(m?.t, 120), x: t(m?.x, 220), v: t(m?.v, 30), u: url(m?.u), d: isoOk(m?.d) || "", remote: m?.remote === true, pkg: t(m?.pkg, 40) })).filter((m) => m.t);
     return { generated: isoOk(d.generated), status: cleanStatus(d.status), security: arr(d.security).map(item).filter((i) => i.t && i.u), ai: arr(d.ai).map(item).filter((i) => i.t && i.u),
-      soc: arr(d.soc).map(item).filter((i) => i.t && i.u), mcp };
+      soc: arr(d.soc).map(item).filter((i) => i.t && i.u), gov: arr(d.gov).map(item).filter((i) => i.t && i.u), mcp };
   },
   malware(d) {
     const fams = {};
@@ -70,13 +70,18 @@ const CLEAN = {
   threatmap(d) {
     const CC = /^[A-Z]{2}$/;
     const c2 = obj(d.c2); const r = obj(d.radar);
+    const named = (v) => arr(v).filter((p) => Array.isArray(p) && p.length === 2).slice(0, 8).map((p) => [t(p[0], 50), num(p[1], 0, 0, 100)]).filter((p) => p[0]);
     const ccPairs = (v, n) => arr(v).filter((p) => Array.isArray(p) && p.length === 2 && CC.test(p[0])).slice(0, n).map((p) => [p[0], num(p[1], 0, 0)]);
     return { generated: isoOk(d.generated), status: cleanStatus(d.status), infocon: ["green", "yellow", "orange", "red"].includes(d.infocon) ? d.infocon : "",
       c2: { total: num(c2.total, 0, 0), online: num(c2.online, 0, 0), countries: ccPairs(c2.countries, 40),
         malware: arr(c2.malware).filter((p) => Array.isArray(p) && p.length === 2).slice(0, 8).map((p) => [t(p[0], 40), num(p[1], 0, 0)]) },
       ports: arr(d.ports).filter((p) => Array.isArray(p) && p.length === 4).slice(0, 10).map((p) => p.map((x) => num(x, 0, 0))),
       radar: d.radar ? { pairs: arr(r.pairs).filter((p) => Array.isArray(p) && p.length === 3 && CC.test(p[0]) && CC.test(p[1])).slice(0, 30).map((p) => [p[0], p[1], num(p[2], 0, 0)]),
-        origins: ccPairs(r.origins, 10), targets: ccPairs(r.targets, 10) } : null };
+        pairs3: arr(r.pairs3).filter((p) => Array.isArray(p) && p.length === 3 && CC.test(p[0]) && CC.test(p[1])).slice(0, 20).map((p) => [p[0], p[1], num(p[2], 0, 0)]),
+        origins: ccPairs(r.origins, 10), targets: ccPairs(r.targets, 10),
+        industries: named(r.industries), mitigation: named(r.mitigation),
+        series: arr(r.series).filter((p) => Array.isArray(p) && p.length === 2 && isoOk(p[0] + ":00Z")).slice(-60).map((p) => [p[0], num(p[1], 0, 0)]) } : null,
+      daily: arr(d.daily).filter((p) => Array.isArray(p) && p.length === 2 && /^\d{4}-\d{2}-\d{2}$/.test(p[0])).slice(-14).map((p) => [p[0], num(p[1], 0, 0)]) };
   },
   certs(d) {
     const P = ["blue", "red", "cloud", "dfir", "grc", "start"], L = ["entry", "mid", "adv"], F = ["lab", "mcq", "mixed"];
@@ -85,6 +90,23 @@ const CLEAN = {
         id: t(c.id, 20), n: t(c.n, 80), by: t(c.by, 40), path: c.path, level: c.level, fmt: c.fmt, focus: t(c.focus, 200),
         tips: arr(c.tips).map((x) => t(x, 160)).slice(0, 4), u: c.u, ok: c.ok !== false })).slice(0, 80),
       news: arr(d.news).map((i) => ({ t: t(i?.t, 200), u: url(i?.u), s: t(i?.s, 60), d: isoOk(i?.d) || "" })).filter((i) => i.u).slice(0, 12) };
+  },
+  advisories(d) {
+    const SEV = ["critical", "high", "medium", "low", "unknown"];
+    return { generated: isoOk(d.generated), status: cleanStatus(d.status),
+      items: arr(d.items).filter((a) => /^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/.test(a?.id) && url(a.u)?.startsWith("https://github.com/")).map((a) => ({
+        id: a.id, cve: CVE.test(a.cve) ? a.cve : "", t: t(a.t, 200), sev: SEV.includes(a.sev) ? a.sev : "unknown", pkg: t(a.pkg, 60), eco: t(a.eco, 10), d: isoOk(a.d) || "", u: a.u })).slice(0, 30) };
+  },
+  contacts(d) {
+    const K = ["cert", "police", "reg", "help"];
+    const item = (c) => (K.includes(c?.kind) && url(c.u) ? { kind: c.kind, n: t(c.n, 60), what: t(c.what, 200), u: c.u, ok: c.ok !== false } : null);
+    const countries = {};
+    for (const [cc, v] of Object.entries(obj(d.countries))) {
+      if (!/^[A-Z]{2}$/.test(cc)) continue;
+      const items = arr(v?.items).map(item).filter(Boolean).slice(0, 6);
+      if (items.length) countries[cc] = { name: t(v.name, 60), items };
+    }
+    return { generated: isoOk(d.generated), checked: isoOk(d.checked), countries, global: arr(d.global).map(item).filter(Boolean).slice(0, 12), guides: arr(d.guides).map(item).filter(Boolean).slice(0, 8) };
   },
   detections(d) {
     const LV = ["informational", "low", "medium", "high", "critical"];
