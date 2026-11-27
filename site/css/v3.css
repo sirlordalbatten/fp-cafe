@@ -763,3 +763,4 @@ p.cert-by{margin:0 0 4px}
 .ps-prev mark.pf{display:inline;padding:0 2px;margin:0}
 .ps-prev mark.pf:has(> div){display:block;width:max-content;max-width:100%}
 @media (max-width:640px){.mf-row{grid-template-columns:minmax(0,1fr) auto}.mf-t{display:none}.mf-p{grid-column:1/-1;order:3}.mf-v{white-space:nowrap}}
+.lchip.l-web i{background:#FFB547}.lchip.l-l3 i{background:#FF8C42}

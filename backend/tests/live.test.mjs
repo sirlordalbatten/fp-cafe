@@ -83,7 +83,8 @@ test("radar sources only run with a token, and fall back to dateRange=1d", async
     return { result: { top_0: [{ originCountryAlpha2: "CN", targetCountryAlpha2: "US", value: "12.5" }, { originCountryAlpha2: "<x>", targetCountryAlpha2: "US", value: "1" }] } };
   };
   const out = await SOURCES["radar:pairs"].run(fx, { CLOUDFLARE_RADAR_TOKEN: "t" }, NOW);
-  assert.deepEqual(out.waf, [["CN", "US", 12.5]]);
+  assert.deepEqual(out.ddos, [["CN", "US", 12.5]]);
+  assert.deepEqual(out.waf, []);
   assert.ok(seen.some((u) => u.includes("dateRange=1d")));
   const keys = FEEDS.map.sources.filter((k) => !SOURCES[k].need || ({})[SOURCES[k].need]);
   assert.deepEqual(keys, ["c2", "isc"]);
@@ -107,4 +108,11 @@ test("every source has a sane ttl and cost", () => {
   for (const [k, s] of Object.entries(SOURCES)) {
     assert.ok(s.ttl >= 5 * 60e3, k + " ttl"); assert.ok([1, 2].includes(s.cost), k + " cost"); assert.equal(typeof s.run, "function");
   }
+});
+
+test("SANS ISC: latest ports and infocon, and a clear failure when both are empty", async () => {
+  const fx = async (url) => (url.includes("infocon") ? { status: "Yellow" } : { 0: { rank: 1, targetport: 23, records: 5000, date: "2026-11-27" }, 1: { rank: 2, targetport: 22, records: 2000 } });
+  const out = await SOURCES.isc.run(fx, {}, NOW);
+  assert.deepEqual(out, { infocon: "yellow", day: "2026-11-27", today: 7000, ports: [[23, 5000], [22, 2000]] });
+  await assert.rejects(SOURCES.isc.run(async () => "<html>blocked</html>", {}, NOW));
 });

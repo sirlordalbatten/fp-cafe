@@ -180,14 +180,14 @@ const DET_REPOS = [["SigmaHQ", "SigmaHQ/sigma", "rules"], ["Elastic", "elastic/d
 // ---------- sources ----------
 // cost: 1 = small JSON, 2 = big parse. ttl in ms. need: env var that must be set.
 export const SOURCES = {
+  // Radar only breaks origin -> target pairs down for DDoS (layer 7 and layer 3). WAF and bot filters return
+  // empty lists, so exploit and bot activity is shown as totals (radar:mix), not as arcs.
   "radar:pairs": { ttl: 5 * MIN, cost: 1, need: "CLOUDFLARE_RADAR_TOKEN", async run(fx, env, now) {
     const q = "limit=20&limitDirection=ORIGIN&limitPerLocation=3";
-    const [waf, ddos, bot, l3] = await Promise.allSettled([
-      radar(fx, env, `attacks/layer7/top/attacks?${q}&mitigationProduct=WAF`, now), radar(fx, env, `attacks/layer7/top/attacks?${q}&mitigationProduct=DDOS`, now),
-      radar(fx, env, `attacks/layer7/top/attacks?${q}&mitigationProduct=BOT_MANAGEMENT`, now), radar(fx, env, `attacks/layer3/top/attacks?limit=16&limitDirection=ORIGIN&limitPerLocation=3`, now)]);
-    const pick = (r) => (r.status === "fulfilled" ? pairs(r.value?.top_0, 20) : []);
-    const out = { waf: pick(waf), ddos: pick(ddos), bot: pick(bot), l3: pick(l3) };
-    if (!out.waf.length && !out.ddos.length && !out.bot.length && !out.l3.length) throw new Error("no radar pairs");
+    const ddos = await radar(fx, env, `attacks/layer7/top/attacks?${q}`, now).catch(() => null);
+    const l3 = await radar(fx, env, `attacks/layer3/top/attacks?limit=16&limitDirection=ORIGIN&limitPerLocation=3`, now).catch(() => null);
+    const out = { waf: [], ddos: pairs(ddos?.top_0, 20), bot: [], l3: pairs(l3?.top_0, 20) };
+    if (!out.ddos.length && !out.l3.length) throw new Error("no radar pairs");
     return out;
   } },
   "radar:loc": { ttl: 5 * MIN, cost: 1, need: "CLOUDFLARE_RADAR_TOKEN", async run(fx, env, now) {
@@ -237,13 +237,16 @@ export const SOURCES = {
       h: SHA256.test(String(s.sha256_hash || "").toLowerCase()) ? String(s.sha256_hash).toLowerCase() : "" })).filter((e) => e.t && e.h).sort(byDate).slice(0, 40);
   } },
   isc: { ttl: 60 * MIN, cost: 1, async run(fx, env, now) {          // SANS asks for no more than one call an hour
-    const day = new Date(now).toISOString().slice(0, 10);
-    const [inf, ports] = await Promise.allSettled([fx("https://isc.sans.edu/api/infocon?json"), fx(`https://isc.sans.edu/api/topports/records/10/${day}?json`)]);
-    const level = inf.status === "fulfilled" ? String(inf.value?.status || "").toLowerCase() : "";
+    const [inf, ports] = await Promise.allSettled([fx("https://isc.sans.edu/api/infocon?json"), fx("https://isc.sans.edu/api/topports/records/10?json")]);
+    const iv = inf.status === "fulfilled" ? inf.value : null;
+    const level = String((Array.isArray(iv) ? iv[0]?.status : iv?.status) || "").toLowerCase();
     const pv = ports.status === "fulfilled" ? ports.value : null;
     const rows = (Array.isArray(pv) ? pv : Object.values(pv || {})).filter((r) => r && typeof r === "object" && "targetport" in r);
     const list = rows.map((r) => [num(r.targetport, 0, 65535), num(r.records, 0)]).filter(([p, n]) => p !== null && n !== null).slice(0, 10);
-    return { infocon: ["green", "yellow", "orange", "red"].includes(level) ? level : "", day, today: list.reduce((s, r) => s + r[1], 0), ports: list };
+    const day = String((!Array.isArray(pv) && pv?.date) || rows[0]?.date || "").slice(0, 10);
+    const infocon = ["green", "yellow", "orange", "red"].includes(level) ? level : "";
+    if (!infocon && !list.length) throw new Error("SANS ISC returned nothing usable");
+    return { infocon, day: /^\d{4}-\d\d-\d\d$/.test(day) ? day : "", today: list.reduce((s, r) => s + r[1], 0), ports: list };
   } },
   "nvd:crit": { ttl: 20 * MIN, cost: 2, async run(fx, env, now) {
     return nvdNewest(fx, env, `pubStartDate=${nvdDate(now - 3 * 864e5)}&pubEndDate=${nvdDate(now)}&cvssV3Severity=CRITICAL`, 40);

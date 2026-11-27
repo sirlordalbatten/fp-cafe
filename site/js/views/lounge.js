@@ -35,7 +35,7 @@ export async function mount(sec) {
     </div>
     <div class="map-feed" id="mapFeedBox" hidden><h4>Live attacks <span class="muted">flows sampled from the last hours of traffic, plus real claims, C2 servers and malware as they appear</span></h4><div class="mf-wrap"><ol id="mapFeed" aria-live="off"></ol></div></div>
     <div class="map-stats" id="mapStats" hidden></div>
-    <div class="map-legend" aria-hidden="true"><span class="lg waf">Exploit attempt</span><span class="lg ddos">Web DDoS</span><span class="lg l3">Network DDoS</span><span class="lg bot">Bot attack</span><span class="lg rw">Ransomware</span><span class="lg c2">Botnet C2</span><span class="lg mw">Malware</span></div>
+    <div class="map-legend" aria-hidden="true"><span class="lg ddos">Web attack (layer 7)</span><span class="lg l3">Network DDoS (layer 3)</span><span class="lg rw">Ransomware claim</span><span class="lg c2">Botnet C2</span><span class="lg mw">Malware</span></div>
     <p class="map-src" id="mapSrc"></p>
   </section>
   <div class="ktiles" id="ktiles"></div>
@@ -95,12 +95,14 @@ function greet() {
 //  * events: real, timestamped happenings (ransomware claims, new botnet C2 servers, new malware URLs and samples).
 //    Each one is shown once, as a pulse on the map (when it has a country) and a line in the feed.
 const T = {
-  waf: { n: "Exploit attempt", layer: "exploit" }, web: { n: "Web attack", layer: "exploit" }, ddos: { n: "Web DDoS", layer: "ddos" }, l3: { n: "Network DDoS", layer: "ddos" },
-  bot: { n: "Bot attack", layer: "bot" }, ransom: { n: "Ransomware claim", layer: "ransom" }, c2: { n: "Botnet C2 online", layer: "malware" },
+  waf: { n: "Exploit attempt", layer: "web" }, web: { n: "Web attack", layer: "web" }, ddos: { n: "Web attack", layer: "web" }, l3: { n: "Network DDoS", layer: "l3" },
+  bot: { n: "Bot attack", layer: "web" }, ransom: { n: "Ransomware claim", layer: "ransom" }, c2: { n: "Botnet C2 online", layer: "malware" },
   url: { n: "Malware URL", layer: "malware" }, sample: { n: "Malware sample", layer: "malware" },
 };
-const LAYERS = [["exploit", "Exploits"], ["ddos", "DDoS"], ["bot", "Bots"], ["malware", "Malware"], ["ransom", "Ransomware"]];
-let layerOn = { exploit: true, ddos: true, bot: true, malware: true, ransom: true };
+// Cloudflare Radar only publishes country-to-country pairs for DDoS-style traffic, so those are the arcs.
+// Exploit types and phishing are shown as totals in the panels under the map.
+const LAYERS = [["web", "Web attacks"], ["l3", "Network DDoS"], ["malware", "Malware and C2"], ["ransom", "Ransomware"]];
+let layerOn = { web: true, l3: true, malware: true, ransom: true };
 let engine = 0, ticks = 0, flows = [], total = 0, queue = [], lastRow = 0, liveMap = null, liveEvents = [], baseKey = "", counterTimer = 0;
 const seen = new Set();
 const SHORTN = { US: "United States", GB: "United Kingdom", RU: "Russia", KR: "South Korea", KP: "North Korea", IR: "Iran", VN: "Vietnam", CD: "DR Congo", CZ: "Czechia", BA: "Bosnia", DO: "Dominican Rep.", AE: "UAE", TW: "Taiwan", SY: "Syria", LA: "Laos", BO: "Bolivia", VE: "Venezuela", TZ: "Tanzania", MD: "Moldova", MK: "North Macedonia" };
