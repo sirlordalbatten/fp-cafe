@@ -1,6 +1,6 @@
 // Runs before every /api/* request.
 import { json, API_HEADERS } from "../../backend/core.mjs";
-const ALLOWED = { "/api/run": "POST", "/api/score": "POST", "/api/board": "GET" };
+const ALLOWED = { "/api/run": "POST", "/api/score": "POST", "/api/board": "GET", "/api/live": "GET" };
 export async function onRequest({ request, next }) {
   const path = new URL(request.url).pathname.replace(/\/+$/, "");
   const method = ALLOWED[path];

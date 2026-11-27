@@ -79,7 +79,7 @@ export function brief(r, { theme, channel, level }) {
     "Sign-off: a believable team name, not a real person's name.",
   ];
   return {
-    name: P(r, NAMES), theme: th.t, pretext: pre, channel: ch[1], level: lv[1], levelWhy: lv[2], outline, flags, channelTip: CH_FLAGS[ch[0]],
+    name: P(r, NAMES), theme: th.t, themeKey: th.k, channelKey: ch[0], levelKey: lv[0], pretext: pre, channel: ch[1], level: lv[1], levelWhy: lv[2], outline, flags, channelTip: CH_FLAGS[ch[0]],
     landing: `Oops, this was a practice ${ch[1].toLowerCase()} from the security team. Nothing bad happened, and nothing you typed was kept. Here's what gave it away: ${flags.slice(0, 2).map((f) => f.toLowerCase()).join("; ")}. Next time, use the Report button. It takes two seconds and it's exactly what we want.`,
     followup: `Two days later, share a short note with everyone: what the simulation looked like, the ${n} red flags, the report rate, and a thank-you to the reporters (by count, not by name).`,
   };

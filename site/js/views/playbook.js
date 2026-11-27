@@ -2,6 +2,7 @@
 // a quick self-check, and a live feed of writing from SOC and detection teams around the world.
 import { $, h, html, put, ext, ago, store, obj, arr, str, copyText, toast } from "../core.js";
 import { load } from "../data.js";
+import { liveAt } from "../live.js";
 import { bump, xp } from "../state.js";
 import { sfx } from "../audio.js";
 import { PRACTICES, SELFCHECK, PLACES, KINDS } from "../content/playbook.js";
@@ -9,7 +10,7 @@ import { PRACTICES, SELFCHECK, PLACES, KINDS } from "../content/playbook.js";
 let tag = "All", soc = [];
 
 export async function mount(sec) {
-  html(sec, `<div class="vh"><h1>SOC playbook</h1><p>What the best-run security teams do, where they wrote it down, and how to try each idea in your own SOC this week. Plus fresh writing from SOC and detection teams, refreshed every few hours.</p></div>
+  html(sec, `<div class="vh"><h1>SOC playbook</h1><p>What the best-run security teams do, where they wrote it down, and how to try each idea in your own SOC this week. Plus fresh writing from SOC and detection teams as they publish it.</p></div>
   <div class="seg tabs" id="pbMode"><button data-m="practices" class="on">Practices</button><button data-m="audit">Surface audit</button></div>
   <div class="two wide-left">
     <div>
@@ -31,7 +32,7 @@ export async function mount(sec) {
 }
 export async function refresh() {
   const n = await load("news"); soc = n?.soc || [];
-  $("#socUpd").textContent = n?.generated ? `refreshed ${ago(n.generated)}` : "";
+  $("#socUpd").textContent = liveAt() ? `live · checked ${ago(new Date(liveAt()).toISOString())}` : n?.generated ? `refreshed ${ago(n.generated)}` : "";
   const T = [["all", "All"], ["detection", "Detection"], ["ir", "Incidents"], ["practice", "How teams work"], ["threat", "Threats"]];
   let cur = "all";
   const draw = () => put($("#socFeed"), (soc.filter((x) => cur === "all" || x.g.includes(cur)).slice(0, 14).map((x) => h("li", ext(x.u, x.t), h("span.muted", ` · ${x.s} · ${ago(x.d)}`), x.x ? h("p.small.muted", x.x) : null)))

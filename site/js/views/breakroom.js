@@ -76,14 +76,32 @@ function pane(p) {
       h("p.muted.small", "If it's more than a bad shift, talk to someone: your lead, a colleague, your employee assistance programme, or a doctor."));
   } else if (p === "shred") {
     const ta = h("textarea.inp", { placeholder: "Type it out. The vendor, the 4 AM page, the person who reply-all'd the phishing email. Nobody will see this.", "aria-label": "Your rant", maxlength: "3000" });
-    const bin = h("div.shredbin", { "aria-hidden": "true" }); const msg = h("p.muted.small", { "aria-live": "polite" });
+    const paper = h("div.shr-paper.empty", "Your rant goes here…");
+    const out = h("div.shr-out", { "aria-hidden": "true" });
+    const shr = h("div.shr", { "aria-hidden": "true" }, h("div.shr-in", paper), h("div.shr-mach", h("b", "FP-SHRED 3000"), h("span.shr-led")), out, h("div.shr-bin"));
+    const msg = h("p.muted.small.center", { "aria-live": "polite" });
+    let busy = false;
+    ta.addEventListener("input", () => { if (busy) return; const t = ta.value.trim(); paper.textContent = t ? t.slice(0, 600) : "Your rant goes here…"; paper.classList.toggle("empty", !t); });
     const go = () => {
       const t = ta.value.trim(); if (!t) { msg.textContent = "Nothing to shred. Lucky you."; return; }
-      put(bin, Array.from({ length: 14 }, (_, k) => { const s = h("span.strip", t.slice(k * 9, k * 9 + 9) || "·"); s.style.left = `${k * 7}%`; s.style.animationDelay = `${k * 40}ms`; return s; }));
-      ta.value = ""; sfx("smash"); msg.textContent = pick(["Shredded. It's gone. It was never stored anywhere.", "Into the bin. The bin has seen worse.", "Shredded and recycled into a slightly better mood.", "Gone. Breathe out. Back to the queue when you're ready."]);
-      bump("smash"); statsUI(); setTimeout(() => put(bin), RM ? 200 : 1600);
+      if (busy) return; busy = true;
+      ta.value = ""; sfx("smash"); bump("smash"); statsUI();
+      const done = () => { paper.textContent = "Your rant goes here…"; paper.className = "shr-paper empty"; shr.classList.remove("run"); put(out); busy = false;
+        msg.textContent = pick(["Shredded. It's gone. It was never stored anywhere.", "Into the bin. The bin has seen worse.", "Shredded and recycled into a slightly better mood.", "Gone. Breathe out. Back to the queue when you're ready."]); };
+      if (RM) { done(); return; }
+      // Each strip shows its own slice of the same sheet, so the text really looks cut.
+      const W = 280, N = 14, sw = W / N;
+      put(out, Array.from({ length: N }, (_, k) => {
+        const copy = h("div.shr-copy", t.slice(0, 600)); copy.style.left = `${-k * sw}px`;
+        const s2 = h("div.shr-strip", copy); s2.style.left = `${k * sw}px`; s2.style.width = `${sw - 1}px`;
+        s2.style.setProperty("--d", `${(k % 2 ? 60 : 0) + Math.floor(Math.random() * 160)}ms`); s2.style.setProperty("--r", `${(Math.random() * 24 - 12).toFixed(1)}deg`);
+        return s2;
+      }));
+      void out.offsetWidth; paper.classList.add("go"); shr.classList.add("run");
+      msg.textContent = "Shredding…";
+      setTimeout(done, 3000);
     };
-    put(box, h("p.muted", "Write the rant. Press shred. It isn't saved, sent or logged. Even we don't see it."), ta, h("div.row", h("button.btn.danger", { onclick: go }, "Shred it")), bin, msg);
+    put(box, h("p.muted", "Write the rant. Press shred. It isn't saved, sent or logged. Even we don't see it."), ta, h("div.row", h("button.btn.danger", { onclick: go }, "Shred it")), shr, msg);
   } else if (p === "wins") {
     const wins = () => arr(store.get("wins", [])).map((w) => ({ t: str(w?.t, 140), d: str(w?.d, 10) })).filter((w) => w.t).slice(0, 200);
     const inp = h("input.search.grow", { type: "text", maxlength: "140", placeholder: "Caught a phish? Closed a ticket nicely? Ate lunch away from the desk? It counts.", "aria-label": "Add a win" });

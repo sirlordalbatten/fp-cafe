@@ -133,6 +133,12 @@ export function load(name) {
   return pending[name];
 }
 export const loaded = (name) => cache[name];
+/** Apply a change from the live feed to already-loaded data, then tell the pages. */
+export async function patch(name, fn) {
+  if (cache[name] === undefined) await load(name);          // never let a live patch hide the full data file
+  const next = fn(cache[name] ?? null); if (!next) return;
+  cache[name] = next; emit("data:" + name, next);
+}
 
 /** Re-fetch everything already loaded. Returns the names whose "generated" time moved on. */
 export async function refresh() {

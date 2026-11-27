@@ -2,6 +2,7 @@
 // notes, see who to call in your country, and what is active right now. Everything stays in this browser.
 import { $, h, put, ext, ago, store, obj, arr, toast, copyText, fmtDur, modal } from "../core.js";
 import { load, cveList } from "../data.js";
+import { live as liveFeed } from "../live.js";
 import { PHASES, CALL_TREE, PLAYBOOKS } from "../content/underattack.js";
 
 const KIND = { cert: "National CERT", police: "Police and fraud", reg: "Data protection regulator", help: "Help and tools" };
@@ -33,6 +34,7 @@ export async function mount(sec) {
   clearInterval(clockTimer); clockTimer = setInterval(tick, 1000);
   await refresh();
 }
+export function onLive() { return refresh(); }
 export function hide() { /* the clock keeps its start time in storage; nothing to stop but the display timer */ }
 export async function refresh() {
   const [c, n, r, m, t, cv] = await Promise.all([load("contacts"), load("news"), load("ransomware"), load("malware"), load("threatmap"), load("cves")]);
@@ -44,12 +46,13 @@ export async function refresh() {
 // ---------- picker ----------
 function picker() {
   const cur = inc();
-  put($("#uaPick"), PLAYBOOKS.map((p) => h("button.ua-p.t-" + p.tone + (p.id === sel ? ".on" : "") + (cur?.pb === p.id ? ".active" : ""), { type: "button", role: "listitem", "aria-pressed": String(p.id === sel), onclick: () => { sel = p.id; picker(); book(); clock(); tree(); liveUI(); window.scrollTo({ top: $("#uaBook").offsetTop - 70, behavior: "smooth" }); } },
+  put($("#uaPick"), PLAYBOOKS.map((p) => h("button.ua-p.t-" + p.tone + (p.id === sel ? ".on" : "") + (cur?.pb === p.id ? ".active" : ""), { type: "button", role: "listitem", "aria-pressed": String(p.id === sel), onclick: () => { if (sel === p.id) return; sel = p.id; picker(); book(true); clock(); tree(); liveUI();
+      const r = $("#uaBook").getBoundingClientRect(); if (r.top > innerHeight * 0.75) $("#uaBook").scrollIntoView({ behavior: "smooth", block: "start" }); } },
     h("span.ua-pn", p.n), cur?.pb === p.id ? h("span.ua-live", "In progress") : null)));
 }
 
 // ---------- the playbook ----------
-function book() {
+function book(swap) {
   const p = pb(); const cur = inc(); const mine = cur?.pb === p.id ? cur : null;
   const done = mine ? mine.done : {};
   const total = PHASES.reduce((n, [k]) => n + (p.steps[k] || []).length, 0); const ticked = Object.keys(done).filter((k) => k.startsWith(p.id + ":")).length;
@@ -57,6 +60,9 @@ function book() {
   put($("#uaBook"),
     h("header.ua-head.t-" + p.tone, ring, h("div", h("h2", p.n), h("p.ua-sign", h("b", "Signs: "), p.sign),
       p.attack.length ? h("p.ua-attack", "MITRE ATT&CK ", p.attack.map((t) => ext(`https://attack.mitre.org/techniques/${t.replace(".", "/")}/`, t, "chip"))) : null)),
+    h("div.ua-two",
+      h("section.ua-dont", h("h3", "Do not"), h("ul", p.dont.map((x) => h("li", x)))),
+      h("section.ua-ev", h("h3", "Keep this evidence"), h("ul", p.evidence.map((x) => h("li", x))))),
     mine ? null : h("p.ua-hint", "Ticking steps and adding notes is easier with the clock running. Press ", h("b", "Start incident"), " on the incident clock."),
     PHASES.map(([k, label], i) => {
       const steps = p.steps[k] || []; if (!steps.length) return null;
@@ -67,10 +73,8 @@ function book() {
           return h("li", h("button.ua-step" + (at ? ".done" : ""), { type: "button", role: "checkbox", "aria-checked": String(!!at), onclick: () => toggle(key, s) },
             h("span.ua-box", { "aria-hidden": "true" }), h("span.ua-st", s), at ? h("span.ua-at", new Date(at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })) : null));
         })));
-    }),
-    h("div.ua-two",
-      h("section.ua-dont", h("h3", "Do not"), h("ul", p.dont.map((x) => h("li", x)))),
-      h("section.ua-ev", h("h3", "Keep this evidence"), h("ul", p.evidence.map((x) => h("li", x))))));
+    }));
+  if (swap) { const b = $("#uaBook"); b.classList.remove("swap"); void b.offsetWidth; b.classList.add("swap"); }
 }
 function progress(n, total) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 44 44"); svg.setAttribute("class", "ua-ring"); svg.setAttribute("aria-hidden", "true");
@@ -171,6 +175,11 @@ function liveUI() {
   const items = (arr2, label) => arr2.length ? h("div.ua-lv", h("h4.ua-sub", label), h("ul.hl", arr2.map((n) => h("li", ext(n.u, n.t), h("span.hm", `${n.s} · ${ago(n.d)}`))))) : null;
   const gov = news?.gov || [];
   const tagged = (g) => (news?.security || []).filter((n) => n.g?.includes(g)).slice(0, 4);
+  const ev = liveFeed("events") || []; const day = (e) => Date.now() - Date.parse(e.t) < 864e5;
+  if (p.live === "ransomware") { const by = {}; for (const e of ev) if (e.k === "ransom" && day(e)) by[e.g] = (by[e.g] || 0) + 1; const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    if (top.length) out.push(h("div.ua-lv", h("h4.ua-sub", "Leak-site claims, last 24 hours"), h("p.ua-tags", top.map(([g, n]) => h("span.chip", `${g} · ${n}`))))); }
+  if (p.live === "malware") { const fresh = ev.filter((e) => (e.k === "sample" || e.k === "c2") && e.g).slice(0, 6);
+    if (fresh.length) out.push(h("div.ua-lv", h("h4.ua-sub", "Just seen in the wild"), h("ul.hl", fresh.map((e) => h("li", h("b", e.g), h("span.hm", `${e.k === "c2" ? "new C2 server" : "new sample" + (e.s ? " (" + e.s + ")" : "")} · ${ago(e.t)}`)))))); }
   if (p.live === "ransomware" && rw?.groups7?.length) out.push(h("div.ua-lv", h("h4.ua-sub", "Most active gangs this week"), h("p.ua-tags", rw.groups7.slice(0, 6).map(([g, n]) => h("span.chip", `${g} · ${n}`))),
     h("p.muted.small", "Ransom notes usually name the gang. Check its known tools and tactics in the Malware bar.")));
   if (p.live === "phishing") out.push(items(tagged("phishing"), "Phishing campaigns in the news"));

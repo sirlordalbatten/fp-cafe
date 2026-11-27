@@ -2,6 +2,7 @@
 // with a risk read-out, an agent walkthrough generated from a live alert, and a prompt-injection scanner.
 import { $, h, html, put, ext, ago, store, RM, fmtNum } from "../core.js";
 import { load, cveList } from "../data.js";
+import { liveAt } from "../live.js";
 import { detail, status, productName } from "../cvecard.js";
 import { bump, xp } from "../state.js";
 import { sfx } from "../audio.js";
@@ -60,14 +61,17 @@ export async function mount(sec) {
   const dot = $("#aiNew"); if (dot) dot.hidden = true;
 }
 
-export async function refresh() {
+// New live data: update the feeds and panels, but leave a walkthrough the reader is in the middle of alone.
+export function onLive() { return refresh(true); }
+export async function refresh(light = false) {
   const [n, c, m, adv] = await Promise.all([load("news"), load("cves"), load("malware"), load("advisories")]);
   advUI(adv);
   news = n?.ai || []; mcp = n?.mcp || [];
   const list = cveList(c);
   aiCves = list.filter(isAiCve).slice(0, 8);
-  $("#aiUpd").textContent = n?.generated ? `refreshed ${ago(n.generated)}` : "";
+  $("#aiUpd").textContent = liveAt() ? `live · checked ${ago(new Date(liveAt()).toISOString())}` : n?.generated ? `refreshed ${ago(n.generated)}` : "";
   if (news[0]) store.set("aiSeen", news[0].u);
+  if (light) { kpis(); feed(); cvesUI(); mcpUI(); return; }
   // scenarios from live data
   scenarios = [];
   const kev = list.find((x) => x.kev && isAiCve(x)) || list.find((x) => x.kev && !x.snapshot);
@@ -102,7 +106,7 @@ function cvesUI() {
 // Security advisories for popular AI/ML and agent libraries (LangChain, vLLM, MCP SDKs, Ollama...).
 function advUI(adv) {
   const items = adv?.items || [];
-  $("#advUpd").textContent = adv?.generated ? `GitHub Advisory Database · ${ago(adv.generated)}` : "GitHub Advisory Database";
+  $("#advUpd").textContent = liveAt() ? "GitHub Advisory Database · live" : adv?.generated ? `GitHub Advisory Database · ${ago(adv.generated)}` : "GitHub Advisory Database";
   const SEV = { critical: "p-crit", high: "p-high", medium: "p-med", low: "p-unk", unknown: "p-unk" };
   put($("#aiAdv"), items.length ? items.slice(0, 8).map((a) => h("li", h("span.pill." + SEV[a.sev], a.sev), h("div.adv-b", ext(a.u, a.t), h("span.hm", [a.pkg, a.eco, a.cve, ago(a.d)].filter(Boolean).join(" · ")))))
     : [h("li.muted", "Advisories for AI libraries appear after the next data refresh.")]);

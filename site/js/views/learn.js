@@ -10,7 +10,7 @@ const done = () => new Set(arr(store.get("lessonsDone", [])));
 let tab = "labs", topic = "All";
 
 export async function mount(sec) {
-  html(sec, `<div class="vh"><h1>Snack lessons</h1><p>Three-minute hands-on labs from real SOC work: BEC, OAuth consent, CloudTrail, KQL, Linux logs, ransomware's first hour and more. Spot the bad line, put the response in order, match the event IDs. Plus one lab built from today's exploited CVE.</p></div>
+  html(sec, `<div class="vh"><h1>Snack lessons</h1><p>Three-minute hands-on labs from real SOC work, plus the attack techniques you'll meet: Kerberoasting, pass-the-hash, DCSync, NTLM relay, SQL injection, SSRF, web shells, AiTM phishing and more. Spot the bad line, put the response in order, match the event IDs. Plus one lab built from today's exploited CVE.</p></div>
   <div class="seg tabs" id="ltabs"><button data-p="labs" class="on">Labs</button><button data-p="cheat">Cheat sheets</button><button data-p="cards">ATT&amp;CK flashcards</button></div>
   <div id="lpane"></div>`);
   $("#ltabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.p; [...$("#ltabs").children].forEach((x) => x.classList.toggle("on", x === b)); pane(); });

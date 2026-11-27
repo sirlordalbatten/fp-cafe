@@ -1,6 +1,7 @@
-// CVE menu: every exploited and critical CVE from the last few months, refreshed every 3 hours.
+// CVE menu: every exploited and critical CVE from the last few months. New ones arrive from the live feed within minutes.
 import { $, h, html, put, ago, store, on } from "../core.js";
 import { load, cveList, classics, newSince, statusLine } from "../data.js";
+import { liveStamp } from "../livepanel.js";
 import { card, detail, isEdge, watchlist } from "../cvecard.js";
 import { profile } from "../state.js";
 
@@ -9,8 +10,9 @@ const SORTS = [["heat", "Hottest"], ["new", "Newest"], ["epss", "Most likely exp
 let list = [], filter = "all", sort = "heat", query = "", shown = 24, fresh = new Set(), mark = () => {};
 
 export async function mount(sec) {
-  html(sec, `<div class="vh"><h1>The CVE menu</h1><p>Every known-exploited and critical CVE from the last few months, refreshed every three hours. Each dish comes with a roast and the grown-up advice.</p></div>
+  html(sec, `<div class="vh"><h1>The CVE menu</h1><p>Every known-exploited and critical CVE from the last few months. New entries land here within minutes of NVD and CISA publishing them. Each dish comes with a roast and the grown-up advice.</p></div>
   <p class="muted small" id="menuStatus"></p>
+  <section class="panel justin" aria-labelledby="jiH"><div class="ph"><h3 id="jiH">Just in</h3><span class="muted small" id="jiUpd"></span></div><ol class="jilist" id="jiList"></ol></section>
   <section class="panel patchfirst" aria-labelledby="pfH"><div class="ph"><h3 id="pfH">Patch first</h3><span class="muted small">Exploited in the wild, newest and most dangerous first. Ransomware use and internet-facing devices jump the queue.</span></div><ol class="pf" id="pfList"></ol></section>
   <div class="filters"><input class="search" id="mq" type="search" placeholder="Search CVE, vendor or product" aria-label="Search the menu">
     <div class="seg" id="mf" role="group" aria-label="Filter"></div><label class="sortl">Sort <select id="ms"></select></label></div>
@@ -25,11 +27,24 @@ export async function mount(sec) {
   $("#ms").addEventListener("change", () => { sort = $("#ms").value; render(); });
   $("#mq").addEventListener("input", () => { query = $("#mq").value.trim().toLowerCase(); shown = 24; render(); });
   $("#menuMore").addEventListener("click", () => { shown += 24; render(); });
+  await refresh(); classicsUI();
+}
+export async function refresh() {
   const c = await load("cves");
   list = cveList(c);
-  $("#menuStatus").textContent = c?.generated ? `${list.length} CVEs · refreshed ${ago(c.generated)} · sources: CISA KEV, NVD, FIRST EPSS. ${statusLine(c)}` : statusLine(c);
+  $("#menuStatus").textContent = c?.generated ? `${list.length} CVEs · full refresh ${ago(c.generated)}, ${liveStamp()} · sources: CISA KEV, NVD, FIRST EPSS. ${statusLine(c)}` : statusLine(c);
   const ns = newSince("menu", list.map((x) => x.id)); fresh = ns.fresh; mark = ns.mark;
-  render(); classicsUI(); patchFirst();
+  render(); patchFirst(); justIn(c);
+}
+function justIn(c) {
+  const box = $("#jiList"); if (!box) return;
+  const kev = (c?.kev || []).map((k) => ({ ...k, when: k.added, tag: "exploited" }));
+  const nvd = (c?.nvd || []).map((k) => ({ ...k, when: k.published, tag: k.sev || "new" }));
+  const rows = [...kev, ...nvd].filter((x) => x.when).sort((a, b) => b.when.localeCompare(a.when)).filter((x, i, a) => a.findIndex((y) => y.id === x.id) === i).slice(0, 6);
+  $("#jiUpd").textContent = liveStamp();
+  put(box, rows.length ? rows.map((x) => { const full = list.find((y) => y.id === x.id) || x;
+    return h("li", h("button.ji", { type: "button", onclick: () => detail(full) }, h("span.pill.ji-" + x.tag, x.tag === "exploited" ? "exploited" : x.tag), h("span.mono", x.id),
+      h("span.ji-p", [x.vendor, x.product].filter(Boolean).join(" ") || (x.desc || "").slice(0, 60)), h("time", x.when))); }) : [h("li.muted.small", "Waiting for the live feed.")]);
 }
 function patchFirst() {
   const score = (c) => (c.ransomware ? 40 : 0) + (isEdge(c) ? 30 : 0) + (c.epss || 0) * 30 + Math.max(0, 30 - (Date.now() - Date.parse(c.date || 0)) / 864e5);

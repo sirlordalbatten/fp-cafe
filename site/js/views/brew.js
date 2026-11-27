@@ -1,6 +1,7 @@
 // Morning brew: a two-minute digest built from today's live data.
 import { $, h, html, put, ext, store, todayKey, pickDay, ago, daysSince, copyText } from "../core.js";
 import { load, cveList, statusLine } from "../data.js";
+import { eventItems, liveStamp } from "../livepanel.js";
 import { productName, detail } from "../cvecard.js";
 import { bump, earn, xp } from "../state.js";
 import { TERMS, FP_DATA, DETECTIONS } from "../content/legacy.js";
@@ -20,6 +21,7 @@ export async function mount(sec) {
       <p class="r-thanks">Thank you for defending. Please come again.</p>
     </article>
     <div class="stack">
+      <div class="panel livep"><div class="ph"><h3>Happening now</h3><span class="muted small" id="brewNowUpd"></span></div><ol class="evlist" id="brewNow"></ol></div>
       <div class="panel det-today"><div class="ph"><h3>Detection of the day</h3><a class="link" href="#detect">Detection lab</a></div><div id="detBrew"></div></div>
       <div class="panel"><div class="ph"><h3>Copy for team chat</h3></div><p class="muted small">A plain-text version of this brew to paste into Teams or Slack.</p><button class="btn sm" id="brewCopy"><svg class="ic"><use href="#i-copy"/></svg>Copy the brew</button></div>
       <div class="panel"><div class="ph"><h3>Patch deadlines</h3><span class="muted small">CISA KEV due dates</span></div><ol class="due" id="dueList"></ol></div>
@@ -30,8 +32,21 @@ export async function mount(sec) {
   const d = new Date();
   $("#brewDate").textContent = d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
   $("#brewShift").textContent = d.getHours() >= 22 || d.getHours() < 6 ? "NIGHT SHIFT" : "DAY SHIFT";
+  $("#brewCopy").addEventListener("click", () => {
+    const lines = [`FP Café brew, ${$("#brewDate").textContent}`, ...[...$("#brewItems").children].map((li, i) => `${i + 1}. ${li.textContent.replace(/Details$/, "").trim()}`), "", ...[...$("#mgr").children].map((p) => p.textContent)];
+    copyText(lines.join("\n"), "Brew copied for team chat");
+  });
+  await fill();
+  if (store.get("brewSeen", "") !== todayKey()) { store.set("brewSeen", todayKey()); bump("brew"); earn(5, "brew"); xp(10, "brew"); }
+  const dot = $("#brewNew"); if (dot) dot.hidden = true;
+}
+export async function refresh() { await fill(); }
+export function onLive() { return fill(); }
+async function fill() {
+  put($("#brewNow"), (() => { const it = eventItems(["ransom", "c2", "sample"], 6); return it.length ? it : [h("li.muted.small", "Waiting for the live feed.")]; })());
+  $("#brewNowUpd").textContent = liveStamp();
   const [c, n, det] = await Promise.all([load("cves"), load("news"), load("detections")]);
-  $("#brewStatus").textContent = c?.generated ? `Data refreshed ${ago(c.generated)}. ${statusLine(c)}` : statusLine(c);
+  $("#brewStatus").textContent = c?.generated ? `Full refresh ${ago(c.generated)}, ${liveStamp()}. ${statusLine(c)}` : statusLine(c);
   const list = cveList(c);
   const kev = list.filter((x) => x.kev).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   const hot = list.filter((x) => !x.kev && (x.cvss || 0) >= 9).sort((a, b) => (b.epss || 0) - (a.epss || 0))[0];
@@ -64,12 +79,6 @@ export async function mount(sec) {
   if (pickD) put($("#detBrew"), h("p", h("b", pickD.title)), h("p.muted.small", `${pickD.srcName} · ${pickD.lang.toUpperCase()} · ${pickD.level}`), h("p.small", pickD.desc), h("a.btn.sm", { href: "#detect" }, "Open in the lab"));
   else { const d0 = pickDay(DETECTIONS); put($("#detBrew"), h("p", h("b", d0.t)), h("p.small", d0.why), h("a.btn.sm", { href: "#detect" }, "Open in the lab")); }
 
-  $("#brewCopy").addEventListener("click", () => {
-    const lines = [`FP Café brew, ${$("#brewDate").textContent}`, ...[...$("#brewItems").children].map((li, i) => `${i + 1}. ${li.textContent.replace(/Details$/, "").trim()}`), "", ...[...$("#mgr").children].map((p) => p.textContent)];
-    copyText(lines.join("\n"), "Brew copied for team chat");
-  });
-  if (store.get("brewSeen", "") !== todayKey()) { store.set("brewSeen", todayKey()); bump("brew"); earn(5, "brew"); xp(10, "brew"); }
-  const dot = $("#brewNew"); if (dot) dot.hidden = true;
 }
 function mdiff(md, now) { if (!md) return 999; const [m, d] = md.split("-").map(Number); let diff = (new Date(now.getFullYear(), m - 1, d) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5; if (diff > 182) diff -= 365; if (diff < -182) diff += 365; return diff; }
 

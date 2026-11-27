@@ -3,6 +3,7 @@
 import { $, $$, h, icon, store, on, emit, toast, pad, nextPatchTuesday, ago, RM, countUp, fmtNum, num } from "./core.js";
 import { Snd, sfx, setChannel, setVolume, setSfx } from "./audio.js";
 import { load, statusLine, refresh } from "./data.js";
+import { pull, liveAt } from "./live.js";
 import { profile, beans, level, visit, tidy, inv } from "./state.js";
 import { initBuddy, setLiveLines } from "./buddy.js";
 import { startIncidents } from "./incidents.js";
@@ -64,8 +65,13 @@ on("profile", strip);
 async function liveData() {
   const chip = $("#liveChip");
   const c = await load("cves");
+  if (liveAt()) {
+    const s = Math.round((Date.now() - liveAt()) / 1000);
+    chip.textContent = s < 60 ? "live · just now" : `live · ${Math.round(s / 60)} min ago`; chip.classList.add("ok", "pulse");
+    chip.title = "Live feeds are checked every few minutes while this tab is open.";
+  }
   if (c && c.generated) {
-    chip.textContent = `live · ${ago(c.generated)}`; chip.classList.add("ok");
+    if (!liveAt()) { chip.textContent = `live · ${ago(c.generated)}`; chip.classList.add("ok"); }
     chip.title = (statusLine(c) || "All sources refreshed normally.") + ` Last refresh ${new Date(c.generated).toLocaleString()}.`;
     const n = c.stats.kevAdded7;
     const wx = n >= 10 ? "Patch storm" : n >= 5 ? "Scattered exploits" : n >= 1 ? "Cloudy, chance of PoC" : "Suspiciously calm";
@@ -82,6 +88,26 @@ async function liveData() {
   }
 }
 
+// Fast lane: each page names the live feeds it shows. While the tab is visible they are polled every
+// one to five minutes; the server caches upstream sources, so this never hammers the original sites.
+const VIEW_FEEDS = { lounge: ["map", "events", "cves"], underattack: ["events", "news", "cves"], desk: ["cves"], brew: ["news", "events", "cves"], menu: ["cves"],
+  malware: ["events", "news"], phishsim: ["news"], ai: ["ai"], detect: ["detect", "soc"], playbook: ["soc", "cves"], shift: ["cves", "news"], toolbox: ["cves"], me: ["news"] };
+const EVERY = { map: 90e3, events: 90e3, cves: 150e3, news: 150e3, soc: 300e3, ai: 240e3, detect: 300e3 };
+const lastPull = {};
+let pulling = false;
+async function livePoll() {
+  if (document.visibilityState !== "visible" || pulling) return;
+  const view = current;
+  const want = (VIEW_FEEDS[view] || ["cves"]).filter((f) => Date.now() - (lastPull[f] || 0) >= EVERY[f]);
+  if (!want.length) return;
+  pulling = true; want.forEach((f) => { lastPull[f] = Date.now(); });
+  const ok = await pull(want); pulling = false;
+  if (!ok) return;
+  liveData();
+  const m = mods[view]; if (!m || view !== current) return;
+  if (m.onLive) m.onLive(want); else if (m.refresh) m.refresh();
+}
+
 // Keep an all-day tab current: every 15 minutes re-fetch the data files. The view on screen redraws
 // itself (if it knows how); data-only views that are mounted but hidden are rebuilt next time they're opened.
 let lastRefresh = Date.now();
@@ -90,6 +116,8 @@ async function liveRefresh() {
   if (document.visibilityState !== "visible") return;
   lastRefresh = Date.now();
   const changed = await refresh(); if (!changed.length) return;
+  for (const k of Object.keys(lastPull)) lastPull[k] = 0;   // fresh files replaced the cache: lay the live data on top again
+  livePoll();
   liveData();
   for (const v of Object.keys(mods)) {
     if (v === current) { if (mods[v].refresh) mods[v].refresh(); else if (REBUILD.has(v)) leaveRebuild.add(v); continue; }
@@ -157,11 +185,12 @@ function boot() {
   $("main").addEventListener("click", (e) => { if (document.body.classList.contains("nav-open") && !e.target.closest("#navToggle")) { document.body.classList.remove("nav-open"); $("#navToggle").setAttribute("aria-expanded", "false"); } });
   $("#navToggle").addEventListener("click", () => { const open = !document.body.classList.contains("nav-open"); document.body.classList.toggle("nav-open", open); $("#navToggle").setAttribute("aria-expanded", String(open)); });
   initBuddy();
-  liveData(); setInterval(() => { if (document.visibilityState === "visible") liveData(); }, 10 * 60e3);
+  liveData(); setInterval(() => { if (document.visibilityState === "visible") liveData(); }, 30e3);
+  setInterval(livePoll, 15e3); setTimeout(livePoll, 1200);
   setInterval(liveRefresh, 15 * 60e3);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - lastRefresh > 15 * 60e3) liveRefresh(); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState !== "visible") return; livePoll(); if (Date.now() - lastRefresh > 15 * 60e3) liveRefresh(); });
   load("news").then((n) => { if (n && n.ai[0] && store.get("aiSeen", "") !== n.ai[0].u) $("#aiNew").hidden = false; });
-  window.addEventListener("hashchange", route);
+  window.addEventListener("hashchange", () => { route(); setTimeout(livePoll, 400); });
   route();
   startIncidents();
   startNudges();

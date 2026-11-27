@@ -1,6 +1,8 @@
-// Detection lab: fresh rules pulled from public repos every 3 hours, plus curated playbooks.
+// Detection lab: fresh rules from public repos, live rule changes within minutes, plus curated playbooks.
 import { $, h, html, put, ext, ago, copyText, daysSince } from "../core.js";
 import { load, statusLine } from "../data.js";
+import { live } from "../live.js";
+import { liveStamp } from "../livepanel.js";
 import { profile, bump, xp } from "../state.js";
 import { DETECTIONS } from "../content/legacy.js";
 
@@ -11,8 +13,9 @@ let rules = [], lang = "all", src = "live", q = "", level = "all";
 
 export async function mount(sec) {
   lang = SIEM_LANG[profile().siem] || "all";
-  html(sec, `<div class="vh"><h1>Detection lab</h1><p>The newest detections from SigmaHQ, Splunk, Microsoft Sentinel and Google SecOps, pulled every three hours, plus curated playbooks with triage and tuning notes. Test on historical data before you enable anything.</p></div>
+  html(sec, `<div class="vh"><h1>Detection lab</h1><p>The newest detections from SigmaHQ, Splunk, Microsoft Sentinel and Google SecOps, with rule changes shown live as they merge upstream, plus curated playbooks with triage and tuning notes. Test on historical data before you enable anything.</p></div>
   <p class="muted small" id="detStatus"></p>
+  <section class="panel livep"><div class="ph"><h3>Just merged upstream</h3><span class="muted small" id="detLiveUpd"></span></div><ol class="evlist" id="detLive"></ol></section>
   <div class="seg tabs" id="dsrc"><button data-s="live" class="on">Fresh from upstream</button><button data-s="curated">Curated playbooks</button></div>
   <div class="filters"><input class="search" id="dlq" type="search" placeholder="Search: lsass, kerberos, T1053, okta" aria-label="Search detections">
     <div class="seg" id="dlf"></div><label class="sortl">Level <select id="dll"><option value="all">Any</option><option value="critical">Critical</option><option value="high">High+</option><option value="medium">Medium+</option></select></label></div>
@@ -27,9 +30,17 @@ export async function mount(sec) {
   rules = d?.rules || [];
   $("#detStatus").textContent = d?.generated ? `${rules.length} fresh rules · refreshed ${ago(d.generated)}. ${statusLine(d)}` : "Fresh rules appear after the first data refresh. Curated playbooks are always here.";
   if (!rules.length) { src = "curated"; [...$("#dsrc").children].forEach((x) => x.classList.toggle("on", x.dataset.s === "curated")); }
-  render();
+  render(); merged();
 }
 
+export function onLive() { merged(); }
+function merged() {
+  const box = $("#detLive"); if (!box) return;
+  const rows = live("detect") || [];
+  $("#detLiveUpd").textContent = liveStamp();
+  put(box, rows.length ? rows.slice(0, 8).map((c) => h("li.evi", h("span.evk", c.s), h("span.evx", ext(c.u, c.t)), h("time", { title: new Date(c.d).toLocaleString() }, ago(c.d))))
+    : [h("li.muted.small", "Waiting for the live feed. New and changed rules from SigmaHQ, Elastic and Splunk appear here as they merge.")]);
+}
 function lvOk(l) { if (level === "all") return true; return LV.indexOf(l) <= LV.indexOf(level); }
 function render() {
   const box = $("#dlList");

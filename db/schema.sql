@@ -16,3 +16,5 @@ CREATE INDEX IF NOT EXISTS scores_game_week ON scores (game, week, score DESC);
 CREATE INDEX IF NOT EXISTS scores_team_week ON scores (team, game, week, score DESC);
 CREATE TABLE IF NOT EXISTS used_runs (nonce TEXT PRIMARY KEY, at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS rl (k TEXT PRIMARY KEY, win INTEGER NOT NULL, n INTEGER NOT NULL);
+-- Cache for /api/live (public threat feeds, refreshed every few minutes). Holds no user data.
+CREATE TABLE IF NOT EXISTS live_cache (k TEXT PRIMARY KEY, ts INTEGER NOT NULL, ok INTEGER NOT NULL, body TEXT NOT NULL);

