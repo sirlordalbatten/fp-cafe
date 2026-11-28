@@ -640,7 +640,6 @@ p.cert-by{margin:0 0 4px}
 .ms h4 .muted{font-weight:400}
 .tl-now{fill:#FF8A8A;animation:ucdot 1.4s ease-in-out infinite}
 .mc-n{font-variant-numeric:tabular-nums}
-@media (prefers-reduced-motion:reduce){.arc-trail{animation:none;stroke-dashoffset:0}.arc-head,.arc-boom,.burst .b2{display:none}.arc .arc-hit{animation:none;opacity:.9}}
 .mf-row{grid-template-columns:132px 92px minmax(0,1fr) auto}
 .mf-k{white-space:nowrap}
 .mf-p>*{flex:none}

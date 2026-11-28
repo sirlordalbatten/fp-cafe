@@ -10,6 +10,8 @@
 //  * Each request refreshes at most a few stale sources (Workers free plan: 10 ms CPU per request), everything
 //    else comes from the cache (D1 if bound, otherwise memory). Failed sources back off and keep their last data.
 
+import { HttpError, readJson } from "./core.mjs";
+
 const CTRL = /[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g;
 const CC = /^[A-Z]{2}$/;
 const CVE = /^CVE-\d{4}-\d{4,7}$/;
@@ -236,18 +238,9 @@ export const SOURCES = {
     return (Array.isArray(raw.data) ? raw.data : []).map((s) => ({ k: "sample", t: iso(s.first_seen), g: FAMILY.test(clean(s.signature, 40)) ? clean(s.signature, 40) : "", s: clean(s.file_type, 12),
       h: SHA256.test(String(s.sha256_hash || "").toLowerCase()) ? String(s.sha256_hash).toLowerCase() : "" })).filter((e) => e.t && e.h).sort(byDate).slice(0, 40);
   } },
-  isc: { ttl: 60 * MIN, cost: 1, async run(fx, env, now) {          // SANS asks for no more than one call an hour
-    const [inf, ports] = await Promise.allSettled([fx("https://isc.sans.edu/api/infocon?json"), fx("https://isc.sans.edu/api/topports/records/10?json")]);
-    const iv = inf.status === "fulfilled" ? inf.value : null;
-    const level = String((Array.isArray(iv) ? iv[0]?.status : iv?.status) || "").toLowerCase();
-    const pv = ports.status === "fulfilled" ? ports.value : null;
-    const rows = (Array.isArray(pv) ? pv : Object.values(pv || {})).filter((r) => r && typeof r === "object" && "targetport" in r);
-    const list = rows.map((r) => [num(r.targetport, 0, 65535), num(r.records, 0)]).filter(([p, n]) => p !== null && n !== null).slice(0, 10);
-    const day = String((!Array.isArray(pv) && pv?.date) || rows[0]?.date || "").slice(0, 10);
-    const infocon = ["green", "yellow", "orange", "red"].includes(level) ? level : "";
-    if (!infocon && !list.length) throw new Error("SANS ISC returned nothing usable");
-    return { infocon, day: /^\d{4}-\d\d-\d\d$/.test(day) ? day : "", today: list.reduce((s, r) => s + r[1], 0), ports: list };
-  } },
+  // SANS ISC refuses requests from Cloudflare's servers, so GitHub Actions fetches it once an hour (the rate SANS
+  // asks for) and pushes it here through POST /api/ingest. The worker never calls ISC itself.
+  isc: { ttl: 75 * MIN, cost: 0, push: true, run() { throw new Error("pushed by GitHub Actions"); } },
   "nvd:crit": { ttl: 20 * MIN, cost: 2, async run(fx, env, now) {
     return nvdNewest(fx, env, `pubStartDate=${nvdDate(now - 3 * 864e5)}&pubEndDate=${nvdDate(now)}&cvssV3Severity=CRITICAL`, 40);
   } },
@@ -303,11 +296,12 @@ for (const [key, name, url, hosts, , ttl] of FEEDS_RSS) SOURCES[key] = { ttl: tt
 const rss = (group) => FEEDS_RSS.filter((f) => f[4] === group).map((f) => f[0]);
 const body = (have, k) => have[k]?.body ?? null;
 export const FEEDS = {
-  map: { sources: ["radar:pairs", "radar:loc", "radar:series", "radar:mix", "c2", "isc"], build(have) {
+  map: { sources: ["radar:pairs", "radar:loc", "radar:series", "radar:mix", "c2", "isc"], build(have, now) {
     const p = body(have, "radar:pairs"), l = body(have, "radar:loc"), m = body(have, "radar:mix"), c = body(have, "c2");
     return { radar: !!(p || l), pairs: p || { waf: [], ddos: [], bot: [], l3: [] }, origins: l?.origins || [], targets: l?.targets || [], series: body(have, "radar:series") || [],
       industries: m?.industries || [], mitigation: m?.mitigation || [], rules: m?.rules || [], email: m?.email || null,
-      c2: c ? { countries: c.countries, malware: c.malware } : null, isc: body(have, "isc") };
+      c2: c ? { countries: c.countries, malware: c.malware } : null,
+      isc: have.isc?.ok && now - have.isc.ts < 3 * 60 * MIN ? have.isc.body : null };    // pushed hourly; older than 3 h is dropped
   } },
   events: { sources: ["rw", "c2", "urlhaus", "bazaar"], build(have) {
     return [...(body(have, "rw") || []), ...(body(have, "c2")?.recent || []), ...(body(have, "urlhaus") || []), ...(body(have, "bazaar") || [])].sort(byDate).slice(0, 120);
@@ -362,16 +356,48 @@ export async function serveLive({ feeds, env = {}, store = memoryStore(), fx = m
   const have = keys.length ? await store.get(keys) : {};
   const age = (k) => (have[k] ? now - have[k].ts : Infinity);
   const due = (k) => { const s = SOURCES[k]; const ttl = have[k] && !have[k].ok ? Math.min(s.ttl, 5 * MIN) : s.ttl; return age(k) >= ttl; };
-  const stale = keys.filter(due).sort((a, b) => age(b) - age(a));
+  const stale = keys.filter((k) => !SOURCES[k].push && due(k)).sort((a, b) => age(b) - age(a));
   const pick = []; let spent = 0;
   for (const k of stale) { const c = SOURCES[k].cost; if (spent + c > BUDGET) continue; pick.push(k); spent += c; if (spent >= BUDGET) break; }
   await Promise.all(pick.map(async (k) => {
     let row;
     try { row = { ts: now, ok: true, body: await SOURCES[k].run(fx, env, now) }; }
-    catch { row = { ts: now, ok: false, body: have[k]?.body ?? null }; }     // back off, keep the last good data
+    catch (e) { row = { ts: now, ok: false, body: have[k]?.body ?? null, err: clean(String(e?.message || e), 60) }; }   // back off, keep the last good data
     have[k] = row; await store.put(k, row);
   }));
   const out = {}; for (const f of feeds) out[f] = FEEDS[f].build(have, now);
-  const src = Object.fromEntries(keys.map((k) => [k, have[k] ? { age: Math.round(age(k) / 1000), ok: have[k].ok && have[k].body !== null } : { age: null, ok: false }]));
+  const src = Object.fromEntries(keys.map((k) => [k, have[k] ? { age: Math.round(age(k) / 1000), ok: have[k].ok && have[k].body !== null, ...(have[k].err ? { err: have[k].err } : {}) } : { age: null, ok: false }]));
   return { generated: new Date(now).toISOString(), feeds: out, src };
+}
+
+// ---------- pushed data (POST /api/ingest) ----------
+export function cleanIsc(d) {
+  if (!d || typeof d !== "object" || Array.isArray(d)) throw new HttpError(400, "bad data");
+  const infocon = String(d.infocon || "").toLowerCase();
+  const day = String(d.day || "");
+  const ports = (Array.isArray(d.ports) ? d.ports : []).filter((p) => Array.isArray(p) && p.length >= 2)
+    .map((p) => [num(p[0], 0, 65535), num(p[1], 0, 1e10)]).filter(([p, n]) => Number.isInteger(p) && Number.isInteger(n)).slice(0, 10);
+  if (!["green", "yellow", "orange", "red"].includes(infocon) && !ports.length) throw new HttpError(400, "nothing usable");
+  return { infocon: ["green", "yellow", "orange", "red"].includes(infocon) ? infocon : "", day: /^\d{4}-\d\d-\d\d$/.test(day) ? day : "",
+    today: ports.reduce((s, r) => s + r[1], 0), ports };
+}
+export const INGEST = { isc: cleanIsc };
+async function digest(s) { return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(s)))); }
+/** Constant-time comparison: both sides are hashed first, so length and content leak nothing. */
+export async function sameSecret(a, b) {
+  const [x, y] = await Promise.all([digest(a), digest(b)]); let d = 0;
+  for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i];
+  return d === 0;
+}
+export async function ingest({ request, env, store, now = Date.now() }) {
+  const secret = env.LIVE_INGEST_SECRET || "";
+  if (secret.length < 32) throw new HttpError(404, "not found");                // switched off until the secret is set
+  const m = (request.headers.get("Authorization") || "").match(/^Bearer ([A-Za-z0-9+/=_-]{32,200})$/);
+  if (!m || !(await sameSecret(m[1], secret))) throw new HttpError(401, "unauthorised");
+  const body = await readJson(request, 4096);
+  const source = String(body.source || "");
+  if (!Object.hasOwn(INGEST, source)) throw new HttpError(400, "unknown source");
+  const data = INGEST[source](body.data);
+  await store.put(source, { ts: now, ok: true, body: data });
+  return { ok: true, source, stored: data };
 }

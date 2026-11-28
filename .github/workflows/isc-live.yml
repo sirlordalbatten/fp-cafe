@@ -1,0 +1,25 @@
+name: isc-live
+# Once an hour: fetch SANS ISC (Infocon level, most-scanned ports) and push it to the site's live API.
+# SANS refuses Cloudflare's servers but answers GitHub's. Nothing is committed, so no builds are used.
+on:
+  schedule:
+    - cron: "23 * * * *"       # hourly, the rate SANS asks for
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: isc-live
+  cancel-in-progress: false
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Push SANS ISC to the live API
+        env:
+          LIVE_INGEST_SECRET: ${{ secrets.LIVE_INGEST_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}   # optional repository variable, for when the site moves to its own domain
+        run: /usr/bin/python3 pipeline/isc_live.py

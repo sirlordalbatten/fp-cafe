@@ -56,8 +56,18 @@ The 3-hourly pipeline is the full refresh. The fast-moving parts (attack flows, 
    | `NVD_API_KEY` | Higher NVD limits for new CVEs | Same key as GitHub, if you have one |
    | `GITHUB_TOKEN` | Higher limits for AI advisories and rule changes | A fine-grained token with **no** permissions (public data only), 1-year expiry |
 
+   | `LIVE_INGEST_SECRET` | Live SANS ISC (Infocon level, most-scanned ports), pushed hourly from GitHub | A random string, see step 3 |
+
    Every one is optional. Without the Radar token the map keeps working from the 3-hourly snapshot.
-3. **Redeploy** (push any commit, or **Deployments → … → Retry deployment**).
+3. **Live SANS ISC.** SANS refuses requests from Cloudflare's servers, so the `isc-live` GitHub workflow fetches ISC once an hour and pushes it to `/api/ingest`. Make one secret and put the **same value** in both places:
+   ```bash
+   openssl rand -hex 32
+   ```
+   * Cloudflare: **fp-cafe → Settings → Variables and Secrets → Add**, type **Secret**, name `LIVE_INGEST_SECRET`.
+   * GitHub: **repo → Settings → Secrets and variables → Actions → New repository secret**, name `LIVE_INGEST_SECRET`.
+
+   Without the secret, `/api/ingest` answers 404 and the workflow skips itself. If the site moves to its own domain, add a repository **variable** (not a secret) `SITE_URL`, for example `https://fpcafe.example`.
+4. **Redeploy** (push any commit, or **Deployments → … → Retry deployment**).
 
 Check it:
 ```bash

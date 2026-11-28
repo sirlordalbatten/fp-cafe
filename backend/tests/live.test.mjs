@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clean, safeUrl, iso, parseFeed, parseFeeds, serveLive, memoryStore, SOURCES, FEEDS, radarWindow, BUDGET } from "../live.mjs";
+import { clean, safeUrl, iso, parseFeed, parseFeeds, serveLive, memoryStore, SOURCES, FEEDS, radarWindow, BUDGET, ingest, cleanIsc } from "../live.mjs";
 
 const NOW = Date.UTC(2026, 10, 28, 10, 7, 0);
 
@@ -106,13 +106,33 @@ test("NVD fetch asks for the count, then the newest page", async () => {
 
 test("every source has a sane ttl and cost", () => {
   for (const [k, s] of Object.entries(SOURCES)) {
-    assert.ok(s.ttl >= 5 * 60e3, k + " ttl"); assert.ok([1, 2].includes(s.cost), k + " cost"); assert.equal(typeof s.run, "function");
+    assert.ok(s.ttl >= 5 * 60e3, k + " ttl"); assert.ok(s.push ? s.cost === 0 : [1, 2].includes(s.cost), k + " cost"); assert.equal(typeof s.run, "function");
   }
 });
 
-test("SANS ISC: latest ports and infocon, and a clear failure when both are empty", async () => {
-  const fx = async (url) => (url.includes("infocon") ? { status: "Yellow" } : { 0: { rank: 1, targetport: 23, records: 5000, date: "2026-11-27" }, 1: { rank: 2, targetport: 22, records: 2000 } });
-  const out = await SOURCES.isc.run(fx, {}, NOW);
-  assert.deepEqual(out, { infocon: "yellow", day: "2026-11-27", today: 7000, ports: [[23, 5000], [22, 2000]] });
-  await assert.rejects(SOURCES.isc.run(async () => "<html>blocked</html>", {}, NOW));
+const SECRET = "s".repeat(40);
+const req = (auth, body, type = "application/json") => new Request("https://fp-cafe.pages.dev/api/ingest", { method: "POST", headers: { "Content-Type": type, ...(auth ? { Authorization: auth } : {}) }, body: JSON.stringify(body) });
+const good = { source: "isc", data: { infocon: "Yellow", day: "2026-11-28", ports: [[23, 5000, 9], [22, 2000, 4], ["<x>", 1]] } };
+
+test("ingest is off without a secret and refuses wrong or missing auth", async () => {
+  const store = memoryStore(new Map());
+  await assert.rejects(ingest({ request: req("Bearer " + SECRET, good), env: {}, store }), (e) => e.status === 404);
+  await assert.rejects(ingest({ request: req(null, good), env: { LIVE_INGEST_SECRET: SECRET }, store }), (e) => e.status === 401);
+  await assert.rejects(ingest({ request: req("Bearer " + "t".repeat(40), good), env: { LIVE_INGEST_SECRET: SECRET }, store }), (e) => e.status === 401);
+  await assert.rejects(ingest({ request: req("Bearer " + SECRET, { source: "nvd:crit", data: {} }), env: { LIVE_INGEST_SECRET: SECRET }, store }), (e) => e.status === 400);
+  await assert.rejects(ingest({ request: req("Bearer " + SECRET, good, "text/plain"), env: { LIVE_INGEST_SECRET: SECRET }, store }), (e) => e.status === 415);
+  assert.equal((await store.get(["isc"])).isc, undefined);
+});
+
+test("pushed ISC data is cleaned, stored and served without the worker calling SANS", async () => {
+  const store = memoryStore(new Map());
+  const r = await ingest({ request: req("Bearer " + SECRET, good), env: { LIVE_INGEST_SECRET: SECRET }, store, now: NOW });
+  assert.deepEqual(r.stored, { infocon: "yellow", day: "2026-11-28", today: 7000, ports: [[23, 5000], [22, 2000]] });
+  const calls = [];
+  const out = await serveLive({ feeds: ["map"], env: {}, store, fx: async (u) => { calls.push(u); throw new Error("offline"); }, now: NOW + 60e3 });
+  assert.deepEqual(out.feeds.map.isc, r.stored);
+  assert.ok(!calls.some((u) => u.includes("isc.sans.edu")));
+  const later = await serveLive({ feeds: ["map"], env: {}, store, fx: async () => { throw new Error("offline"); }, now: NOW + 4 * 3600e3 });
+  assert.equal(later.feeds.map.isc, null, "older than 3 hours is dropped");
+  assert.throws(() => cleanIsc({ infocon: "purple", ports: [] }));
 });

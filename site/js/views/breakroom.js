@@ -88,7 +88,6 @@ function pane(p) {
       ta.value = ""; sfx("smash"); bump("smash"); statsUI();
       const done = () => { paper.textContent = "Your rant goes here…"; paper.className = "shr-paper empty"; shr.classList.remove("run"); put(out); busy = false;
         msg.textContent = pick(["Shredded. It's gone. It was never stored anywhere.", "Into the bin. The bin has seen worse.", "Shredded and recycled into a slightly better mood.", "Gone. Breathe out. Back to the queue when you're ready."]); };
-      if (RM) { done(); return; }
       // Each strip shows its own slice of the same sheet, so the text really looks cut.
       const W = 280, N = 14, sw = W / N;
       put(out, Array.from({ length: N }, (_, k) => {

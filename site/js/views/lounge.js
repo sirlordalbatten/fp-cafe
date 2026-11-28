@@ -144,7 +144,7 @@ function map() {
     for (const e of takeEvents(liveEvents, true)) feedRow(e, true);
     for (let i = 0; i < 3 && flows.length; i++) feedRow({ flow: pickFlow(), at: new Date(Date.now() - (3 - i) * 2500) }, true);
   }
-  clearInterval(engine); engine = setInterval(spawn, RM ? 2400 : 620);
+  clearInterval(engine); engine = setInterval(spawn, 620);
   panels();
 }
 // Static layers: land with ransomware heat, botnet C2 dots, graticule, sweep. Rebuilt only when that data changes.
@@ -219,7 +219,7 @@ function label(cc, cls, ms) {
 function arc(f) {
   const a = world.CENTROIDS[f.o], b = world.CENTROIDS[f.t]; const layer = $("#arcLayer");
   const g = el("g", { class: "arc live k-" + f.kind }); const w = 1 + Math.min(2.4, f.v / 6);
-  const ms = RM ? 3000 : 4200;
+  const ms = 4200;
   if (f.o === f.t) {
     g.append(el("circle", { cx: a[0], cy: a[1], r: 5 + w * 3, class: "selfhit" }));
   } else {
@@ -256,11 +256,11 @@ function feedRow(x, silent) {
     row = h("li.mf-row.evt", h("span.mf-k.k-" + e.k, T[e.k].n), h("span.mf-t", { title: when.toLocaleString() }, hhmm(when)), h("span.mf-p", text), h("span.mf-v", ago(e.t)));
   }
   list.prepend(row);
-  if (!silent && !RM) {
+  if (!silent) {
+    // Web Animations, not CSS transitions: the site-wide reduced-motion rule shortens transitions to nothing.
     const shift = row.getBoundingClientRect().height + 4;
-    list.style.transition = "none"; list.style.transform = `translateY(-${shift}px)`; void list.offsetHeight;
-    list.style.transition = "transform .7s cubic-bezier(.2,.8,.2,1)"; list.style.transform = "translateY(0)";
-    row.classList.add("in");
+    list.animate([{ transform: `translateY(-${shift}px)` }, { transform: "translateY(0)" }], { duration: 700, easing: "cubic-bezier(.2,.8,.2,1)" });
+    row.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, easing: "ease-out" });
   }
   setTimeout(() => { while (list.children.length > 7) list.lastElementChild.remove(); }, silent ? 0 : 800);
 }
@@ -353,6 +353,7 @@ export function onLive(feeds) {
   if (feeds.includes("cves")) { cvesRaw = loaded("cves"); cves = cveList(cvesRaw); stats = cvesRaw?.stats || stats; tiles(); patchFirst(); }
   const ic = $("#infocon"); const lv = liveMap?.isc?.infocon;
   if (ic && lv) { ic.hidden = false; ic.className = "infocon ic-" + lv; ic.textContent = `Infocon ${lv}`; }
+  if (feeds.includes("map")) ports();
   if (!world || !$("#mapWrap")) return;
   pools(); base(); panels();
 }
@@ -409,8 +410,9 @@ function barsInto(box, items, cls) {
     return h("li", h("span.bar-k", k, sub ? h("small", sub) : null), h("span.bar", f), h("span.bar-v", fmtNum(v))); }));
 }
 function ports() {
-  const p = tm?.ports || [];
-  $("#portSrc").textContent = p.length ? "SANS ISC, today" : "";
+  const lp = liveMap?.isc?.ports || []; const p = lp.length ? lp : tm?.ports || [];
+  const day = liveMap?.isc?.day ? new Date(liveMap.isc.day + "T12:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
+  $("#portSrc").textContent = !p.length ? "" : lp.length ? `SANS ISC${day ? ", " + day : ""} · live` : "SANS ISC, today";
   if (!p.length) { put($("#ports"), h("li.muted", "Appears after the next data refresh.")); return; }
   barsInto($("#ports"), p.slice(0, 6).map(([port, rec]) => [String(port), rec, PORTS[port] || ""]), "pt");
 }
